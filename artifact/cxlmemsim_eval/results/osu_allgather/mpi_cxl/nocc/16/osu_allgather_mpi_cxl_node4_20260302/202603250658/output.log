@@ -1,0 +1,507 @@
+/usr/local/bin/mpirun --allow-run-as-root -np 16 --map-by ppr:4:node -hostfile /root/hostfile4 -x CXL_SHIM_ALLOC=1 -x CXL_SHIM_COPY_SEND=1 -x CXL_SHIM_COPY_RECV=1 -x CXL_DAX_PATH=/dev/dax0.0 -x CXL_DAX_RESET=1 -x GLIBC_TUNABLES=glibc.cpu.hwcaps=-AVX512F,-AVX512DQ,-AVX512BW,-AVX512VL -x LD_PRELOAD=/root/gromacs/libmpi_cxl_shim_nocc.so /root/osu-micro-benchmarks-7.4-ext/libexec/osu-micro-benchmarks/mpi/collective/osu_allgather -m :16384 -i 200 2>&1 | tee -a ${LOG_DIR}/output.log
+
+┌──────────────────────────────────────────────────────────┐
+│    CXL MPI SHIM LIBRARY v3.0 - Remotable Pointer Edition  │
+├──────────────────────────────────────────────────────────┤
+│ Host: cxl-vm-01                                            │
+│ PID:  439                                                  │
+│ Time: 1774421910                                           │
+├──────────────────────────────────────────────────────────┤
+│ FEATURES:                                                │
+│   - CXL Direct Send/Recv via shared DAX device          │
+│   - Remotable pointers (offset-based addressing)        │
+│   - Per-rank message queues in shared memory            │
+│   - Inline small messages (<4KB) optimization           │
+│   - Cache coherence: disabled (MPI_Barrier sync)        │
+├──────────────────────────────────────────────────────────┤
+│ CONFIGURATION:                                           │
+│   CXL_DAX_PATH: /dev/dax0.0                              │
+│   CXL_DIRECT: (auto for DAX)                             │
+│   CXL_SHIM_VERBOSE: NO                                   │
+│   CXL_SHIM_TRACE: NO                                     │
+│   CXL_DAX_RESET: YES                                     │
+└──────────────────────────────────────────────────────────┘
+
+[32m[CXL_SHIM:cxl-vm-01:439:INFO] === MPI_Init HOOK CALLED (hook #1) ===
+[0m
+┌──────────────────────────────────────────────────────────┐
+│    CXL MPI SHIM LIBRARY v3.0 - Remotable Pointer Edition  │
+├──────────────────────────────────────────────────────────┤
+│ Host: cxl-vm-01                                            │
+│ PID:  441                                                  │
+│ Time: 1774421910                                           │
+├──────────────────────────────────────────────────────────┤
+│ FEATURES:                                                │
+│   - CXL Direct Send/Recv via shared DAX device          │
+│   - Remotable pointers (offset-based addressing)        │
+│   - Per-rank message queues in shared memory            │
+│   - Inline small messages (<4KB) optimization           │
+│   - Cache coherence: disabled (MPI_Barrier sync)        │
+├──────────────────────────────────────────────────────────┤
+│ CONFIGURATION:                                           │
+│   CXL_DAX_PATH: /dev/dax0.0                              │
+│   CXL_DIRECT: (auto for DAX)                             │
+│   CXL_SHIM_VERBOSE: NO                                   │
+│   CXL_SHIM_TRACE: NO                                     │
+│   CXL_DAX_RESET: YES                                     │
+└──────────────────────────────────────────────────────────┘
+
+[32m[CXL_SHIM:cxl-vm-01:441:INFO] === MPI_Init HOOK CALLED (hook #1) ===
+[0m
+┌──────────────────────────────────────────────────────────┐
+│    CXL MPI SHIM LIBRARY v3.0 - Remotable Pointer Edition  │
+├──────────────────────────────────────────────────────────┤
+│ Host: cxl-vm-01                                            │
+│ PID:  438                                                  │
+│ Time: 1774421910                                           │
+├──────────────────────────────────────────────────────────┤
+│ FEATURES:                                                │
+│   - CXL Direct Send/Recv via shared DAX device          │
+│   - Remotable pointers (offset-based addressing)        │
+│   - Per-rank message queues in shared memory            │
+│   - Inline small messages (<4KB) optimization           │
+│   - Cache coherence: disabled (MPI_Barrier sync)        │
+├──────────────────────────────────────────────────────────┤
+│ CONFIGURATION:                                           │
+│   CXL_DAX_PATH: /dev/dax0.0                              │
+│   CXL_DIRECT: (auto for DAX)                             │
+│   CXL_SHIM_VERBOSE: NO                                   │
+│   CXL_SHIM_TRACE: NO                                     │
+│   CXL_DAX_RESET: YES                                     │
+└──────────────────────────────────────────────────────────┘
+
+[32m[CXL_SHIM:cxl-vm-01:438:INFO] === MPI_Init HOOK CALLED (hook #1) ===
+[0m
+┌──────────────────────────────────────────────────────────┐
+│    CXL MPI SHIM LIBRARY v3.0 - Remotable Pointer Edition  │
+├──────────────────────────────────────────────────────────┤
+│ Host: cxl-vm-01                                            │
+│ PID:  440                                                  │
+│ Time: 1774421910                                           │
+├──────────────────────────────────────────────────────────┤
+│ FEATURES:                                                │
+│   - CXL Direct Send/Recv via shared DAX device          │
+│   - Remotable pointers (offset-based addressing)        │
+│   - Per-rank message queues in shared memory            │
+│   - Inline small messages (<4KB) optimization           │
+│   - Cache coherence: disabled (MPI_Barrier sync)        │
+├──────────────────────────────────────────────────────────┤
+│ CONFIGURATION:                                           │
+│   CXL_DAX_PATH: /dev/dax0.0                              │
+│   CXL_DIRECT: (auto for DAX)                             │
+│   CXL_SHIM_VERBOSE: NO                                   │
+│   CXL_SHIM_TRACE: NO                                     │
+│   CXL_DAX_RESET: YES                                     │
+└──────────────────────────────────────────────────────────┘
+
+[32m[CXL_SHIM:cxl-vm-01:440:INFO] === MPI_Init HOOK CALLED (hook #1) ===
+[0m
+┌──────────────────────────────────────────────────────────┐
+│    CXL MPI SHIM LIBRARY v3.0 - Remotable Pointer Edition  │
+├──────────────────────────────────────────────────────────┤
+│ Host: cxl-vm-03                                            │
+│ PID:  643                                                  │
+│ Time: 1774421910                                           │
+├──────────────────────────────────────────────────────────┤
+│ FEATURES:                                                │
+│   - CXL Direct Send/Recv via shared DAX device          │
+│   - Remotable pointers (offset-based addressing)        │
+│   - Per-rank message queues in shared memory            │
+│   - Inline small messages (<4KB) optimization           │
+│   - Cache coherence: disabled (MPI_Barrier sync)        │
+├──────────────────────────────────────────────────────────┤
+│ CONFIGURATION:                                           │
+│   CXL_DAX_PATH: /dev/dax0.0                              │
+│   CXL_DIRECT: (auto for DAX)                             │
+│   CXL_SHIM_VERBOSE: NO                                   │
+│   CXL_SHIM_TRACE: NO                                     │
+│   CXL_DAX_RESET: YES                                     │
+└──────────────────────────────────────────────────────────┘
+
+[32m[CXL_SHIM:cxl-vm-03:643:INFO] === MPI_Init HOOK CALLED (hook #1) ===
+[0m
+
+┌──────────────────────────────────────────────────────────┐
+│    CXL MPI SHIM LIBRARY v3.0 - Remotable Pointer Edition  │
+├──────────────────────────────────────────────────────────┤
+│ Host: cxl-vm-03                                            │
+│ PID:  644                                                  │
+│ Time: 1774421910                                           │
+├──────────────────────────────────────────────────────────┤
+│ FEATURES:                                                │
+│   - CXL Direct Send/Recv via shared DAX device          │
+│   - Remotable pointers (offset-based addressing)        │
+│   - Per-rank message queues in shared memory            │
+│   - Inline small messages (<4KB) optimization           │
+│   - Cache coherence: disabled (MPI_Barrier sync)        │
+├──────────────────────────────────────────────────────────┤
+│ CONFIGURATION:                                           │
+│   CXL_DAX_PATH: /dev/dax0.0                              │
+│   CXL_DIRECT: (auto for DAX)                             │
+│   CXL_SHIM_VERBOSE: NO                                   │
+│   CXL_SHIM_TRACE: NO                                     │
+│   CXL_DAX_RESET: YES                                     │
+└──────────────────────────────────────────────────────────┘
+
+[32m[CXL_SHIM:cxl-vm-03:644:INFO] === MPI_Init HOOK CALLED (hook #1) ===
+[0m
+┌──────────────────────────────────────────────────────────┐
+│    CXL MPI SHIM LIBRARY v3.0 - Remotable Pointer Edition  │
+├──────────────────────────────────────────────────────────┤
+│ Host: cxl-vm-03                                            │
+│ PID:  645                                                  │
+│ Time: 1774421910                                           │
+├──────────────────────────────────────────────────────────┤
+│ FEATURES:                                                │
+│   - CXL Direct Send/Recv via shared DAX device          │
+│   - Remotable pointers (offset-based addressing)        │
+│   - Per-rank message queues in shared memory            │
+
+┌──────────────────────────────────────────────────────────┐
+│    CXL MPI SHIM LIBRARY v3.0 - Remotable Pointer Edition  │
+├──────────────────────────────────────────────────────────┤
+│ Host: cxl-vm-04                                            │
+│ PID:  5950                                                 │
+│ Time: 1774421895                                           │
+├──────────────────────────────────────────────────────────┤
+│ FEATURES:                                                │
+│   - CXL Direct Send/Recv via shared DAX device          │
+│   - Remotable pointers (offset-based addressing)        │
+│   - Per-rank message queues in shared memory            │
+│   - Inline small messages (<4KB) optimization           │
+│   - Cache coherence: disabled (MPI_Barrier sync)        │
+├──────────────────────────────────────────────────────────┤
+│ CONFIGURATION:                                           │
+│   CXL_DAX_PATH: /dev/dax0.0                              │
+│   CXL_DIRECT: (auto for DAX)                             │
+│   CXL_SHIM_VERBOSE: NO                                   │
+│   CXL_SHIM_TRACE: NO                                     │
+│   CXL_DAX_RESET: YES                                     │
+└──────────────────────────────────────────────────────────┘
+
+[32m[CXL_SHIM:cxl-vm-04:5950:INFO] === MPI_Init HOOK CALLED (hook #1) ===
+[0m│   - Inline small messages (<4KB) optimization           │
+┌──────────────────────────────────────────────────────────┐
+│    CXL MPI SHIM LIBRARY v3.0 - Remotable Pointer Edition  │
+├──────────────────────────────────────────────────────────┤
+│ Host: cxl-vm-02                                            │
+│ PID:  3331                                                 │
+│ Time: 1774421906                                           │
+├──────────────────────────────────────────────────────────┤
+│ FEATURES:                                                │
+│   - CXL Direct Send/Recv via shared DAX device          │
+│   - Remotable pointers (offset-based addressing)        │
+│   - Per-rank message queues in shared memory            │
+│   - Inline small messages (<4KB) optimization           │
+│   - Cache coherence: disabled (MPI_Barrier sync)        │
+├──────────────────────────────────────────────────────────┤
+│ CONFIGURATION:                                           │
+│   CXL_DAX_PATH: /dev/dax0.0                              │
+│   CXL_DIRECT: (auto for DAX)                             │
+│   CXL_SHIM_VERBOSE: NO                                   │
+│   CXL_SHIM_TRACE: NO                                     │
+│   CXL_DAX_RESET: YES                                     │
+└──────────────────────────────────────────────────────────┘
+
+[32m[CXL_SHIM:cxl-vm-02:3331:INFO] === MPI_Init HOOK CALLED (hook #1) ===
+[0m
+│   - Cache coherence: disabled (MPI_Barrier sync)        │
+
+┌──────────────────────────────────────────────────────────┐
+│    CXL MPI SHIM LIBRARY v3.0 - Remotable Pointer Edition  │
+├──────────────────────────────────────────────────────────┤
+│ Host: cxl-vm-02                                            │
+│ PID:  3330                                                 │
+│ Time: 1774421906                                           │
+├──────────────────────────────────────────────────────────┤
+│ FEATURES:                                                │
+│   - CXL Direct Send/Recv via shared DAX device          │
+│   - Remotable pointers (offset-based addressing)        │
+│   - Per-rank message queues in shared memory            │
+│   - Inline small messages (<4KB) optimization           │
+│   - Cache coherence: disabled (MPI_Barrier sync)        │
+├──────────────────────────────────────────────────────────┤
+│ CONFIGURATION:                                           │
+│   CXL_DAX_PATH: /dev/dax0.0                              │
+│   CXL_DIRECT: (auto for DAX)                             │
+│   CXL_SHIM_VERBOSE: NO                                   │
+│   CXL_SHIM_TRACE: NO                                     │
+│   CXL_DAX_RESET: YES                                     │
+└──────────────────────────────────────────────────────────┘
+
+[32m[CXL_SHIM:cxl-vm-02:3330:INFO] === MPI_Init HOOK CALLED (hook #1) ===
+[0m┌──────────────────────────────────────────────────────────┐
+├──────────────────────────────────────────────────────────┤
+
+┌──────────────────────────────────────────────────────────┐
+│    CXL MPI SHIM LIBRARY v3.0 - Remotable Pointer Edition  │
+├──────────────────────────────────────────────────────────┤
+│ Host: cxl-vm-02                                            │
+│ PID:  3332                                                 │
+│ Time: 1774421906                                           │
+├──────────────────────────────────────────────────────────┤
+│ FEATURES:                                                │
+│   - CXL Direct Send/Recv via shared DAX device          │
+│   - Remotable pointers (offset-based addressing)        │
+│   - Per-rank message queues in shared memory            │
+│   - Inline small messages (<4KB) optimization           │
+│   - Cache coherence: disabled (MPI_Barrier sync)        │
+├──────────────────────────────────────────────────────────┤
+│ CONFIGURATION:                                           │
+│   CXL_DAX_PATH: /dev/dax0.0                              │
+│   CXL_DIRECT: (auto for DAX)                             │
+│   CXL_SHIM_VERBOSE: NO                                   │
+│   CXL_SHIM_TRACE: NO                                     │
+│   CXL_DAX_RESET: YES                                     │
+└──────────────────────────────────────────────────────────┘
+
+[32m[CXL_SHIM:cxl-vm-02:3332:INFO] === MPI_Init HOOK CALLED (hook #1) ===
+[0m│    CXL MPI SHIM LIBRARY v3.0 - Remotable Pointer Edition  │
+│ CONFIGURATION:                                           │
+
+┌──────────────────────────────────────────────────────────┐
+│    CXL MPI SHIM LIBRARY v3.0 - Remotable Pointer Edition  │
+├──────────────────────────────────────────────────────────┤
+│ Host: cxl-vm-02                                            │
+│ PID:  3333                                                 │
+│ Time: 1774421906                                           │
+├──────────────────────────────────────────────────────────┤
+│ FEATURES:                                                │
+│   - CXL Direct Send/Recv via shared DAX device          │
+│   - Remotable pointers (offset-based addressing)        │
+│   - Per-rank message queues in shared memory            │
+│   - Inline small messages (<4KB) optimization           │
+│   - Cache coherence: disabled (MPI_Barrier sync)        │
+├──────────────────────────────────────────────────────────┤
+│ CONFIGURATION:                                           │
+│   CXL_DAX_PATH: /dev/dax0.0                              │
+│   CXL_DIRECT: (auto for DAX)                             │
+│   CXL_SHIM_VERBOSE: NO                                   │
+│   CXL_SHIM_TRACE: NO                                     │
+│   CXL_DAX_RESET: YES                                     │
+└──────────────────────────────────────────────────────────┘
+
+[32m[CXL_SHIM:cxl-vm-02:3333:INFO] === MPI_Init HOOK CALLED (hook #1) ===
+[0m├──────────────────────────────────────────────────────────┤
+│   CXL_DAX_PATH: /dev/dax0.0                              │
+│   CXL_DIRECT: (auto for DAX)                             │
+│   CXL_SHIM_VERBOSE: NO                                   │
+│   CXL_SHIM_TRACE: NO                                     │
+│   CXL_DAX_RESET: YES                                     │
+└──────────────────────────────────────────────────────────┘
+
+[32m[CXL_SHIM:cxl-vm-03:645:INFO] === MPI_Init HOOK CALLED (hook #1) ===
+[0m
+┌──────────────────────────────────────────────────────────┐
+│    CXL MPI SHIM LIBRARY v3.0 - Remotable Pointer Edition  │
+├──────────────────────────────────────────────────────────┤
+│ Host: cxl-vm-03                                            │
+│ PID:  646                                                  │
+│ Time: 1774421910                                           │
+├──────────────────────────────────────────────────────────┤
+│ FEATURES:                                                │
+│   - CXL Direct Send/Recv via shared DAX device          │
+│   - Remotable pointers (offset-based addressing)        │
+│   - Per-rank message queues in shared memory            │
+│   - Inline small messages (<4KB) optimization           │
+│   - Cache coherence: disabled (MPI_Barrier sync)        │
+├──────────────────────────────────────────────────────────┤
+│ CONFIGURATION:                                           │
+│   CXL_DAX_PATH: /dev/dax0.0                              │
+│   CXL_DIRECT: (auto for DAX)                             │
+│   CXL_SHIM_VERBOSE: NO                                   │
+│   CXL_SHIM_TRACE: NO                                     │
+│   CXL_DAX_RESET: YES                                     │
+└──────────────────────────────────────────────────────────┘
+
+[32m[CXL_SHIM:cxl-vm-03:646:INFO] === MPI_Init HOOK CALLED (hook #1) ===
+[0m│ Host: cxl-vm-04                                            │
+│ PID:  5951                                                 │
+│ Time: 1774421895                                           │
+├──────────────────────────────────────────────────────────┤
+│ FEATURES:                                                │
+│   - CXL Direct Send/Recv via shared DAX device          │
+│   - Remotable pointers (offset-based addressing)        │
+│   - Per-rank message queues in shared memory            │
+│   - Inline small messages (<4KB) optimization           │
+│   - Cache coherence: disabled (MPI_Barrier sync)        │
+├──────────────────────────────────────────────────────────┤
+│ CONFIGURATION:                                           │
+│   CXL_DAX_PATH: /dev/dax0.0                              │
+│   CXL_DIRECT: (auto for DAX)                             │
+│   CXL_SHIM_VERBOSE: NO                                   │
+│   CXL_SHIM_TRACE: NO                                     │
+│   CXL_DAX_RESET: YES                                     │
+└──────────────────────────────────────────────────────────┘
+
+[32m[CXL_SHIM:cxl-vm-04:5951:INFO] === MPI_Init HOOK CALLED (hook #1) ===
+[0m
+┌──────────────────────────────────────────────────────────┐
+│    CXL MPI SHIM LIBRARY v3.0 - Remotable Pointer Edition  │
+├──────────────────────────────────────────────────────────┤
+│ Host: cxl-vm-04                                            │
+│ PID:  5952                                                 │
+│ Time: 1774421895                                           │
+├──────────────────────────────────────────────────────────┤
+│ FEATURES:                                                │
+│   - CXL Direct Send/Recv via shared DAX device          │
+│   - Remotable pointers (offset-based addressing)        │
+│   - Per-rank message queues in shared memory            │
+│   - Inline small messages (<4KB) optimization           │
+│   - Cache coherence: disabled (MPI_Barrier sync)        │
+├──────────────────────────────────────────────────────────┤
+│ CONFIGURATION:                                           │
+│   CXL_DAX_PATH: /dev/dax0.0                              │
+│   CXL_DIRECT: (auto for DAX)                             │
+│   CXL_SHIM_VERBOSE: NO                                   │
+│   CXL_SHIM_TRACE: NO                                     │
+│   CXL_DAX_RESET: YES                                     │
+└──────────────────────────────────────────────────────────┘
+
+[32m[CXL_SHIM:cxl-vm-04:5952:INFO] === MPI_Init HOOK CALLED (hook #1) ===
+[0m
+┌──────────────────────────────────────────────────────────┐
+│    CXL MPI SHIM LIBRARY v3.0 - Remotable Pointer Edition  │
+├──────────────────────────────────────────────────────────┤
+│ Host: cxl-vm-04                                            │
+│ PID:  5953                                                 │
+│ Time: 1774421895                                           │
+├──────────────────────────────────────────────────────────┤
+│ FEATURES:                                                │
+│   - CXL Direct Send/Recv via shared DAX device          │
+│   - Remotable pointers (offset-based addressing)        │
+│   - Per-rank message queues in shared memory            │
+│   - Inline small messages (<4KB) optimization           │
+│   - Cache coherence: disabled (MPI_Barrier sync)        │
+├──────────────────────────────────────────────────────────┤
+│ CONFIGURATION:                                           │
+│   CXL_DAX_PATH: /dev/dax0.0                              │
+│   CXL_DIRECT: (auto for DAX)                             │
+│   CXL_SHIM_VERBOSE: NO                                   │
+│   CXL_SHIM_TRACE: NO                                     │
+│   CXL_DAX_RESET: YES                                     │
+└──────────────────────────────────────────────────────────┘
+
+[32m[CXL_SHIM:cxl-vm-04:5953:INFO] === MPI_Init HOOK CALLED (hook #1) ===
+[0m[32m[CXL_SHIM:cxl-vm-01:439:INFO] Mapped DAX device /dev/dax0.0: 1054867456 bytes (1006 MB) at 0x100000000000 (FIXED)
+[0m[32m[CXL_SHIM:cxl-vm-01:439:INFO] Reset DAX allocation counter
+[0m[32m[CXL_SHIM:cxl-vm-01:439:INFO] Initializing CXL shared memory structures...
+[0m[32m[CXL_SHIM:cxl-vm-01:438:INFO] Mapped DAX device /dev/dax0.0: 1054867456 bytes (1006 MB) at 0x100000000000 (FIXED)
+[0m[32m[CXL_SHIM:cxl-vm-01:438:INFO] Reset DAX allocation counter
+[0m[32m[CXL_SHIM:cxl-vm-01:438:INFO] Initializing CXL shared memory structures...
+[0m[32m[CXL_SHIM:cxl-vm-01:441:INFO] Mapped DAX device /dev/dax0.0: 1054867456 bytes (1006 MB) at 0x100000000000 (FIXED)
+[0m[32m[CXL_SHIM:cxl-vm-01:441:INFO] Reset DAX allocation counter
+[0m[32m[CXL_SHIM:cxl-vm-01:441:INFO] Initializing CXL shared memory structures...
+[0m[32m[CXL_SHIM:cxl-vm-03:644:INFO] [32m[CXL_SHIM:cxl-vm-04:5951:INFO] Mapped DAX device /dev/dax0.0: 1054867456 bytes (1006 MB) at 0x100000000000 (FIXED)
+[0m[32m[CXL_SHIM:cxl-vm-01:440:INFO] Mapped DAX device /dev/dax0.0: 1054867456 bytes (1006 MB) at 0x100000000000 (FIXED)
+[0mMapped DAX device /dev/dax0.0: 1054867456 bytes (1006 MB) at 0x100000000000 (FIXED)
+[0m[32m[CXL_SHIM:cxl-vm-04:5950:INFO] Mapped DAX device /dev/dax0.0: 1054867456 bytes (1006 MB) at 0x100000000000 (FIXED)
+[0m[32m[CXL_SHIM:cxl-vm-03:645:INFO] Mapped DAX device /dev/dax0.0: 1054867456 bytes (1006 MB) at 0x100000000000 (FIXED)
+[0m[32m[CXL_SHIM:cxl-vm-04:5952:INFO] Mapped DAX device /dev/dax0.0: 1054867456 bytes (1006 MB) at 0x100000000000 (FIXED)
+[0m[32m[CXL_SHIM:cxl-vm-03:643:INFO] Mapped DAX device /dev/dax0.0: 1054867456 bytes (1006 MB) at 0x100000000000 (FIXED)
+[0m[32m[CXL_SHIM:cxl-vm-03:646:INFO] Mapped DAX device /dev/dax0.0: 1054867456 bytes (1006 MB) at 0x100000000000 (FIXED)
+[0m[32m[CXL_SHIM:cxl-vm-02:3332:INFO] Mapped DAX device /dev/dax0.0: 1054867456 bytes (1006 MB) at 0x100000000000 (FIXED)
+[0m[32m[CXL_SHIM:cxl-vm-03:643:INFO] Reset DAX allocation counter
+[0m[32m[CXL_SHIM:cxl-vm-03:643:INFO] Initializing CXL shared memory structures...
+[0m[32m[CXL_SHIM:cxl-vm-02:3330:INFO] [32m[CXL_SHIM:cxl-vm-03:644:INFO] Reset DAX allocation counter
+[0m[32m[CXL_SHIM:cxl-vm-03:644:INFO] Initializing CXL shared memory structures...
+[0m[32m[CXL_SHIM:cxl-vm-02:3333:INFO] Mapped DAX device /dev/dax0.0: 1054867456 bytes (1006 MB) at 0x100000000000 (FIXED)
+[0m[32m[CXL_SHIM:cxl-vm-01:440:INFO] Reset DAX allocation counter
+[0m[32m[CXL_SHIM:cxl-vm-01:440:INFO] Initializing CXL shared memory structures...
+[0m[32m[CXL_SHIM:cxl-vm-03:645:INFO] Reset DAX allocation counter
+[0m[32m[CXL_SHIM:cxl-vm-03:645:INFO] Initializing CXL shared memory structures...
+[0m[32m[CXL_SHIM:cxl-vm-02:3331:INFO] Mapped DAX device /dev/dax0.0: 1054867456 bytes (1006 MB) at 0x100000000000 (FIXED)
+[0m[32m[CXL_SHIM:cxl-vm-03:646:INFO] Reset DAX allocation counter
+[0m[32m[CXL_SHIM:cxl-vm-03:646:INFO] Initializing CXL shared memory structures...
+[0m[32m[CXL_SHIM:cxl-vm-02:3331:INFO] Reset DAX allocation counter
+[0m[32m[CXL_SHIM:cxl-vm-02:3331:INFO] Initializing CXL shared memory structures...
+[0mMapped DAX device /dev/dax0.0: 1054867456 bytes (1006 MB) at 0x100000000000 (FIXED)
+[0m[32m[CXL_SHIM:cxl-vm-02:3330:INFO] Reset DAX allocation counter
+[0m[32m[CXL_SHIM:cxl-vm-02:3330:INFO] Initializing CXL shared memory structures...
+[0m[32m[CXL_SHIM:cxl-vm-04:5953:INFO] Mapped DAX device /dev/dax0.0: 1054867456 bytes (1006 MB) at 0x100000000000 (FIXED)
+[0m[32m[CXL_SHIM:cxl-vm-04:5953:INFO] Reset DAX allocation counter
+[0m[32m[CXL_SHIM:cxl-vm-04:5953:INFO] Initializing CXL shared memory structures...
+[0m[32m[CXL_SHIM:cxl-vm-04:5951:INFO] Reset DAX allocation counter
+[0m[32m[CXL_SHIM:cxl-vm-04:5951:INFO] Initializing CXL shared memory structures...
+[0m[32m[CXL_SHIM:cxl-vm-04:5950:INFO] Reset DAX allocation counter
+[0m[32m[CXL_SHIM:cxl-vm-04:5950:INFO] Initializing CXL shared memory structures...
+[0m[32m[CXL_SHIM:cxl-vm-04:5952:INFO] Reset DAX allocation counter
+[0m[32m[CXL_SHIM:cxl-vm-04:5952:INFO] Initializing CXL shared memory structures...
+[0m[32m[CXL_SHIM:cxl-vm-02:3332:INFO] Reset DAX allocation counter
+[0m[32m[CXL_SHIM:cxl-vm-02:3332:INFO] Initializing CXL shared memory structures...
+[0m[32m[CXL_SHIM:cxl-vm-02:3333:INFO] Reset DAX allocation counter
+[0m[32m[CXL_SHIM:cxl-vm-02:3333:INFO] Initializing CXL shared memory structures...
+[0m[32m[CXL_SHIM:cxl-vm-03:644:INFO] CXL shared memory structures initialized (header_size=5279744 bytes, max_ranks=256)
+[0m[32m[CXL_SHIM:cxl-vm-03:644:INFO] CXL memory initialized: type=dax, size=1006 MB, base=0x100000000000, header=0x100000000000, mailboxes=0x100000000840
+[0m[32m[CXL_SHIM:cxl-vm-03:644:INFO] Rank 9 resetting local CXL collective state
+[0m[32m[CXL_SHIM:cxl-vm-02:3331:INFO] CXL shared memory structures initialized (header_size=5279744 bytes, max_ranks=256)
+[0m[32m[CXL_SHIM:cxl-vm-02:3331:INFO] CXL memory initialized: type=dax, size=1006 MB, base=0x100000000000, header=0x100000000000, mailboxes=0x100000000840
+[0m[32m[CXL_SHIM:cxl-vm-02:3331:INFO] Rank 4 resetting local CXL collective state
+[0m[32m[CXL_SHIM:cxl-vm-03:646:INFO] CXL shared memory structures initialized (header_size=5279744 bytes, max_ranks=256)
+[0m[32m[CXL_SHIM:cxl-vm-03:646:INFO] CXL memory initialized: type=dax, size=1006 MB, base=0x100000000000, header=0x100000000000, mailboxes=0x100000000840
+[0m[32m[CXL_SHIM:cxl-vm-03:646:INFO] Rank 11 resetting local CXL collective state
+[0m[32m[CXL_SHIM:cxl-vm-03:643:INFO] CXL shared memory structures initialized (header_size=5279744 bytes, max_ranks=256)
+[0m[32m[CXL_SHIM:cxl-vm-03:643:INFO] CXL memory initialized: type=dax, size=1006 MB, base=0x100000000000, header=0x100000000000, mailboxes=0x100000000840
+[0m[32m[CXL_SHIM:cxl-vm-03:643:INFO] Rank 8 resetting local CXL collective state
+[0m[32m[CXL_SHIM:cxl-vm-01:438:INFO] CXL shared memory structures initialized (header_size=5279744 bytes, max_ranks=256)
+[0m[32m[CXL_SHIM:cxl-vm-01:438:INFO] CXL memory initialized: type=dax, size=1006 MB, base=0x100000000000, header=0x100000000000, mailboxes=0x100000000840
+[0m[32m[CXL_SHIM:cxl-vm-01:438:INFO] Rank 0 resetting local CXL collective state
+[0m[32m[CXL_SHIM:cxl-vm-04:5950:INFO] CXL shared memory structures initialized (header_size=5279744 bytes, max_ranks=256)
+[0m[32m[CXL_SHIM:cxl-vm-04:5950:INFO] CXL memory initialized: type=dax, size=1006 MB, base=0x100000000000, header=0x100000000000, mailboxes=0x100000000840
+[0m[32m[CXL_SHIM:cxl-vm-04:5950:INFO] Rank 13 resetting local CXL collective state
+[0m[32m[CXL_SHIM:cxl-vm-03:645:INFO] CXL shared memory structures initialized (header_size=5279744 bytes, max_ranks=256)
+[0m[32m[CXL_SHIM:cxl-vm-03:645:INFO] CXL memory initialized: type=dax, size=1006 MB, base=0x100000000000, header=0x100000000000, mailboxes=0x100000000840
+[0m[32m[CXL_SHIM:cxl-vm-03:645:INFO] Rank 10 resetting local CXL collective state
+[0m[32m[CXL_SHIM:cxl-vm-01:440:INFO] CXL shared memory structures initialized (header_size=5279744 bytes, max_ranks=256)
+[0m[32m[CXL_SHIM:cxl-vm-01:440:INFO] CXL memory initialized: type=dax, size=1006 MB, base=0x100000000000, header=0x100000000000, mailboxes=0x100000000840
+[32m[CXL_SHIM:cxl-vm-02:3330:INFO] CXL shared memory structures initialized (header_size=5279744 bytes, max_ranks=256)
+[0m[32m[CXL_SHIM:cxl-vm-02:3330:INFO] CXL memory initialized: type=dax, size=1006 MB, base=0x100000000000, header=0x100000000000, mailboxes=0x100000000840
+[0m[32m[CXL_SHIM:cxl-vm-02:3330:INFO] Rank 5 resetting local CXL collective state
+[0m[0m[32m[CXL_SHIM:cxl-vm-01:440:INFO] Rank 2 resetting local CXL collective state
+[0m[32m[CXL_SHIM:cxl-vm-04:5953:INFO] CXL shared memory structures initialized (header_size=5279744 bytes, max_ranks=256)
+[0m[32m[CXL_SHIM:cxl-vm-04:5953:INFO] CXL memory initialized: type=dax, size=1006 MB, base=0x100000000000, header=0x100000000000, mailboxes=0x100000000840
+[0m[32m[CXL_SHIM:cxl-vm-04:5953:INFO] Rank 12 resetting local CXL collective state
+[0m[32m[CXL_SHIM:cxl-vm-02:3333:INFO] CXL shared memory structures initialized (header_size=5279744 bytes, max_ranks=256)
+[0m[32m[CXL_SHIM:cxl-vm-02:3333:INFO] CXL memory initialized: type=dax, size=1006 MB, base=0x100000000000, header=0x100000000000, mailboxes=0x100000000840
+[0m[32m[CXL_SHIM:cxl-vm-02:3333:INFO] Rank 6 resetting local CXL collective state
+[0m[32m[CXL_SHIM:cxl-vm-01:441:INFO] CXL shared memory structures initialized (header_size=5279744 bytes, max_ranks=256)
+[0m[32m[CXL_SHIM:cxl-vm-01:441:INFO] CXL memory initialized: type=dax, size=1006 MB, base=0x100000000000, header=0x100000000000, mailboxes=0x100000000840
+[0m[32m[CXL_SHIM:cxl-vm-01:441:INFO] Rank 3 resetting local CXL collective state
+[0m[32m[CXL_SHIM:cxl-vm-04:5952:INFO] CXL shared memory structures initialized (header_size=5279744 bytes, max_ranks=256)
+[0m[32m[CXL_SHIM:cxl-vm-04:5952:INFO] CXL memory initialized: type=dax, size=1006 MB, base=0x100000000000, header=0x100000000000, mailboxes=0x100000000840
+[0m[32m[CXL_SHIM:cxl-vm-04:5952:INFO] Rank 14 resetting local CXL collective state
+[0m[32m[CXL_SHIM:cxl-vm-04:5951:INFO] CXL shared memory structures initialized (header_size=5279744 bytes, max_ranks=256)
+[0m[32m[CXL_SHIM:cxl-vm-04:5951:INFO] CXL memory initialized: type=dax, size=1006 MB, base=0x100000000000, header=0x100000000000, mailboxes=0x100000000840
+[0m[32m[CXL_SHIM:cxl-vm-04:5951:INFO] Rank 15 resetting local CXL collective state
+[0m[32m[CXL_SHIM:cxl-vm-01:439:INFO] CXL shared memory structures initialized (header_size=5279744 bytes, max_ranks=256)
+[0m[32m[CXL_SHIM:cxl-vm-01:439:INFO] CXL memory initialized: type=dax, size=1006 MB, base=0x100000000000, header=0x100000000000, mailboxes=0x100000000840
+[0m[32m[CXL_SHIM:cxl-vm-01:439:INFO] Rank 1 resetting local CXL collective state
+[0m[32m[CXL_SHIM:cxl-vm-02:3332:INFO] CXL shared memory structures initialized (header_size=5279744 bytes, max_ranks=256)
+[0m[32m[CXL_SHIM:cxl-vm-02:3332:INFO] CXL memory initialized: type=dax, size=1006 MB, base=0x100000000000, header=0x100000000000, mailboxes=0x100000000840
+[0m[32m[CXL_SHIM:cxl-vm-02:3332:INFO] Rank 7 resetting local CXL collective state
+[0m[32m[CXL_SHIM:cxl-vm-01:441:INFO] [32m[CXL_SHIM:cxl-vm-01:438:INFO] Registered rank 0/16 in CXL shared memory (pid=438, host=cxl-vm-01, cxl_comm=enabled)
+[0m[32m[CXL_SHIM:cxl-vm-01:439:INFO] Registered rank 1/16 in CXL shared memory (pid=439, host=cxl-vm-01, cxl_comm=enabled)
+[0m[32m[CXL_SHIM:cxl-vm-01:440:INFO] Registered rank 3/16 in CXL shared memory (pid=441, host=cxl-vm-01, cxl_comm=enabled)
+Registered rank 2/16 in CXL shared memory (pid=440, host=cxl-vm-01, cxl_comm=enabled)
+[0m[0m[32m[CXL_SHIM:cxl-vm-02:3331:INFO] [32m[CXL_SHIM:cxl-vm-02:3333:INFO] [32m[CXL_SHIM:cxl-vm-02:3330:INFO] [32m[CXL_SHIM:cxl-vm-02:3332:INFO] Registered rank 5/16 in CXL shared memory (pid=3330, host=cxl-vm-02, cxl_comm=enabled)
+[32m[CXL_SHIM:cxl-vm-03:645:INFO] [0m[32m[CXL_SHIM:cxl-vm-03:646:INFO] Registered rank 6/16 in CXL shared memory (pid=3333, host=cxl-vm-02, cxl_comm=enabled)
+[32m[CXL_SHIM:cxl-vm-03:643:INFO] Registered rank 7/16 in CXL shared memory (pid=3332, host=cxl-vm-02, cxl_comm=enabled)
+[0mRegistered rank 4/16 in CXL shared memory (pid=3331, host=cxl-vm-02, cxl_comm=enabled)
+[0m[0m[32m[CXL_SHIM:cxl-vm-03:644:INFO] [32m[CXL_SHIM:cxl-vm-04:5953:INFO] Registered rank 8/16 in CXL shared memory (pid=643, host=cxl-vm-03, cxl_comm=enabled)
+[0m[32m[CXL_SHIM:cxl-vm-04:5950:INFO] Registered rank 9/16 in CXL shared memory (pid=644, host=cxl-vm-03, cxl_comm=enabled)
+[0m[32m[CXL_SHIM:cxl-vm-04:5952:INFO] Registered rank 11/16 in CXL shared memory (pid=646, host=cxl-vm-03, cxl_comm=enabled)
+Registered rank 10/16 in CXL shared memory (pid=645, host=cxl-vm-03, cxl_comm=enabled)
+[0mRegistered rank 14/16 in CXL shared memory (pid=5952, host=cxl-vm-04, cxl_comm=enabled)
+Registered rank 13/16 in CXL shared memory (pid=5950, host=cxl-vm-04, cxl_comm=enabled)
+[0m[0m[32m[CXL_SHIM:cxl-vm-04:5951:INFO] [0mRegistered rank 12/16 in CXL shared memory (pid=5953, host=cxl-vm-04, cxl_comm=enabled)
+[0m[cxl-vm-01:00000] *** An error occurred in Socket closed
+[cxl-vm-01:00000] *** reported by process [1988427777,3]
+[cxl-vm-01:00000] *** on a NULL communicator
+[cxl-vm-01:00000] *** Unknown error
+[cxl-vm-01:00000] *** MPI_ERRORS_ARE_FATAL (processes in this communicator will now abort,
+[cxl-vm-01:00000] ***    and MPI will try to terminate your MPI job as well)
+--------------------------------------------------------------------------
+prterun noticed that process rank 15 with PID 5951 on node cxl-vm-04 exited on
+signal 4 (Illegal instruction).
+--------------------------------------------------------------------------
+ 

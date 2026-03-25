@@ -1,0 +1,134 @@
+/usr/local/bin/mpirun --allow-run-as-root -np 2 --map-by ppr:1:node -hostfile /root/hostfile2 -x CXL_SHIM_ALLOC=1 -x CXL_SHIM_COPY_SEND=1 -x CXL_SHIM_COPY_RECV=1 -x CXL_DAX_PATH=/dev/dax0.0 -x CXL_DAX_RESET=1 -x GLIBC_TUNABLES=glibc.cpu.hwcaps=-AVX512F,-AVX512DQ,-AVX512BW,-AVX512VL -x LD_PRELOAD=/root/gromacs/libmpi_cxl_shim_nocc.so /root/osu-micro-benchmarks-7.4-ext/libexec/osu-micro-benchmarks/mpi/one-sided/osu_get_bw -m :16384 -i 200 2>&1 | tee -a ${LOG_DIR}/output.log
+
+┌──────────────────────────────────────────────────────────┐
+│    CXL MPI SHIM LIBRARY v3.0 - Remotable Pointer Edition  │
+├──────────────────────────────────────────────────────────┤
+│ Host: cxl-vm-01                                            │
+│ PID:  477                                                  │
+│ Time: 1774422004                                           │
+├──────────────────────────────────────────────────────────┤
+│ FEATURES:                                                │
+│   - CXL Direct Send/Recv via shared DAX device          │
+│   - Remotable pointers (offset-based addressing)        │
+│   - Per-rank message queues in shared memory            │
+│   - Inline small messages (<4KB) optimization           │
+│   - Cache coherence: disabled (MPI_Barrier sync)        │
+├──────────────────────────────────────────────────────────┤
+│ CONFIGURATION:                                           │
+│   CXL_DAX_PATH: /dev/dax0.0                              │
+│   CXL_DIRECT: (auto for DAX)                             │
+│   CXL_SHIM_VERBOSE: NO                                   │
+│   CXL_SHIM_TRACE: NO                                     │
+│   CXL_DAX_RESET: YES                                     │
+└──────────────────────────────────────────────────────────┘
+
+[32m[CXL_SHIM:cxl-vm-01:477:INFO] === MPI_Init HOOK CALLED (hook #1) ===
+[0m
+┌──────────────────────────────────────────────────────────┐
+│    CXL MPI SHIM LIBRARY v3.0 - Remotable Pointer Edition  │
+├──────────────────────────────────────────────────────────┤
+│ Host: cxl-vm-02                                            │
+│ PID:  3374                                                 │
+│ Time: 1774422000                                           │
+├──────────────────────────────────────────────────────────┤
+│ FEATURES:                                                │
+│   - CXL Direct Send/Recv via shared DAX device          │
+│   - Remotable pointers (offset-based addressing)        │
+│   - Per-rank message queues in shared memory            │
+│   - Inline small messages (<4KB) optimization           │
+│   - Cache coherence: disabled (MPI_Barrier sync)        │
+├──────────────────────────────────────────────────────────┤
+│ CONFIGURATION:                                           │
+│   CXL_DAX_PATH: /dev/dax0.0                              │
+│   CXL_DIRECT: (auto for DAX)                             │
+│   CXL_SHIM_VERBOSE: NO                                   │
+│   CXL_SHIM_TRACE: NO                                     │
+│   CXL_DAX_RESET: YES                                     │
+└──────────────────────────────────────────────────────────┘
+
+[32m[CXL_SHIM:cxl-vm-02:3374:INFO] === MPI_Init HOOK CALLED (hook #1) ===
+[0m[32m[CXL_SHIM:cxl-vm-01:477:INFO] Mapped DAX device /dev/dax0.0: 1054867456 bytes (1006 MB) at 0x100000000000 (FIXED)
+[0m[32m[CXL_SHIM:cxl-vm-02:3374:INFO] Mapped DAX device /dev/dax0.0: 1054867456 bytes (1006 MB) at 0x100000000000 (FIXED)
+[0m[32m[CXL_SHIM:cxl-vm-01:477:INFO] Reset DAX allocation counter
+[0m[32m[CXL_SHIM:cxl-vm-01:477:INFO] Initializing CXL shared memory structures...
+[0m[32m[CXL_SHIM:cxl-vm-02:3374:INFO] Reset DAX allocation counter
+[0m[32m[CXL_SHIM:cxl-vm-02:3374:INFO] Initializing CXL shared memory structures...
+[0m[32m[CXL_SHIM:cxl-vm-02:3374:INFO] CXL shared memory structures initialized (header_size=5279744 bytes, max_ranks=256)
+[0m[32m[CXL_SHIM:cxl-vm-02:3374:INFO] CXL memory initialized: type=dax, size=1006 MB, base=0x100000000000, header=0x100000000000, mailboxes=0x100000000840
+[0m[32m[CXL_SHIM:cxl-vm-02:3374:INFO] Rank 1 resetting local CXL collective state
+[0m[32m[CXL_SHIM:cxl-vm-01:477:INFO] CXL shared memory structures initialized (header_size=5279744 bytes, max_ranks=256)
+[0m[32m[CXL_SHIM:cxl-vm-01:477:INFO] CXL memory initialized: type=dax, size=1006 MB, base=0x100000000000, header=0x100000000000, mailboxes=0x100000000840
+[0m[32m[CXL_SHIM:cxl-vm-01:477:INFO] Rank 0 resetting local CXL collective state
+[0m[32m[CXL_SHIM:cxl-vm-01:477:INFO] Registered rank 0/2 in CXL shared memory (pid=477, host=cxl-vm-01, cxl_comm=enabled)
+[0m[32m[CXL_SHIM:cxl-vm-01:477:INFO] Multi-node detected: CXL collectives disabled (not all 2 ranks visible on local DAX)
+[0m[32m[CXL_SHIM:cxl-vm-01:477:INFO] MPI_Init completed: rank=0/2, CXL=initialized, CXL_DIRECT=enabled, all_local=no
+[0m[32m[CXL_SHIM:cxl-vm-02:3374:INFO] Registered rank 1/2 in CXL shared memory (pid=3374, host=cxl-vm-02, cxl_comm=enabled)
+[0m[32m[CXL_SHIM:cxl-vm-02:3374:INFO] Multi-node detected: CXL collectives disabled (not all 2 ranks visible on local DAX)
+[0m[32m[CXL_SHIM:cxl-vm-02:3374:INFO] MPI_Init completed: rank=1/2, CXL=initialized, CXL_DIRECT=enabled, all_local=no
+[0m[cxl-vm-01:00477] osc_ucx_component.c:369  Error: OSC UCX component priority set inside component query failed 
+ 
+[cxl-vm-02:03374] osc_ucx_component.c:369  Error: OSC UCX component priority set inside component query failed 
+ 
+[32m[CXL_SHIM:cxl-vm-01:477:INFO] MPI_Win_allocate: allocated window 0x653d177d9050, base=0x100000508840, CXL=enabled
+[0m[32m[CXL_SHIM:cxl-vm-02:3374:INFO] MPI_Win_allocate: allocated window 0x5838a9a7b040, base=0x100000508840, CXL=enabled
+# OSU MPI_Get Bandwidth Test v7.4
+# Window creation: MPI_Win_allocate
+# Synchronization: MPI_Win_flush
+# Datatype: MPI_CHAR.
+# Size      Bandwidth (MB/s)
+1                       0.01
+[0m[cxl-vm-01:00477] osc_ucx_component.c:369  Error: OSC UCX component priority set inside component query failed 
+ 
+[cxl-vm-02:03374] osc_ucx_component.c:369  Error: OSC UCX component priority set inside component query failed 
+ 
+[32m[CXL_SHIM:cxl-vm-01:477:INFO] MPI_Win_allocate: allocated window 0x653d177d9050, base=0x10000050e840, CXL=enabled
+[0m[32m[CXL_SHIM:cxl-vm-02:3374:INFO] MPI_Win_allocate: allocated window 0x5838a9a7b040, base=0x100000509840, CXL=enabled
+2                       0.02
+[0m[cxl-vm-01:00477] osc_ucx_component.c:369  Error: OSC UCX component priority set inside component query failed 
+ 
+[cxl-vm-02:03374] osc_ucx_component.c:369  Error: OSC UCX component priority set inside component query failed 
+ 
+[32m[CXL_SHIM:cxl-vm-01:477:INFO] MPI_Win_allocate: allocated window 0x653d177d9050, base=0x100000514840, CXL=enabled
+[0m[32m[CXL_SHIM:cxl-vm-02:3374:INFO] MPI_Win_allocate: allocated window 0x5838a9a7b040, base=0x10000050a840, CXL=enabled
+4                       0.04
+[0m[cxl-vm-01:00477] osc_ucx_component.c:369  Error: OSC UCX component priority set inside component query failed 
+ 
+[cxl-vm-02:03374] osc_ucx_component.c:369  Error: OSC UCX component priority set inside component query failed 
+ 
+[32m[CXL_SHIM:cxl-vm-01:477:INFO] MPI_Win_allocate: allocated window 0x653d177d9050, base=0x10000051a840, CXL=enabled
+[0m[32m[CXL_SHIM:cxl-vm-02:3374:INFO] MPI_Win_allocate: allocated window 0x5838a9a7b040, base=0x10000050b840, CXL=enabled
+8                       0.07
+[0m[cxl-vm-01:00477] osc_ucx_component.c:369  Error: OSC UCX component priority set inside component query failed 
+ 
+[cxl-vm-02:03374] osc_ucx_component.c:369  Error: OSC UCX component priority set inside component query failed 
+ 
+[32m[CXL_SHIM:cxl-vm-01:477:INFO] MPI_Win_allocate: allocated window 0x653d177d9050, base=0x100000520840, CXL=enabled
+[0m[32m[CXL_SHIM:cxl-vm-02:3374:INFO] MPI_Win_allocate: allocated window 0x5838a9a7b040, base=0x10000050c840, CXL=enabled
+[0m--------------------------------------------------------------------------
+An MPI communication peer process has unexpectedly disconnected.  This
+usually indicates a failure in the peer process (e.g., a crash or
+otherwise exiting without calling MPI_FINALIZE first).
+
+Although this local MPI process will likely now behave unpredictably
+(it may even hang or crash), the root cause of this problem is the
+failure of the peer -- that is what you need to investigate.  For
+example, there may be a core file that you can examine.  More
+generally: such peer hangups are frequently caused by application bugs
+or other external events.
+
+  Local host: cxl-vm-01
+  Local PID:  477
+  Peer host:  cxl-vm-02
+--------------------------------------------------------------------------
+ [cxl-vm-01:00000] *** An error occurred in Socket closed
+[cxl-vm-01:00000] *** reported by process [1622081537,0]
+[cxl-vm-01:00000] *** on a NULL communicator
+[cxl-vm-01:00000] *** Unknown error
+[cxl-vm-01:00000] *** MPI_ERRORS_ARE_FATAL (processes in this communicator will now abort,
+[cxl-vm-01:00000] ***    and MPI will try to terminate your MPI job as well)
+--------------------------------------------------------------------------
+prterun has exited due to process rank 0 with PID 0 on node cxl-vm-01 calling
+"abort". This may have caused other processes in the application to be
+terminated by signals sent by prterun (as reported here).
+--------------------------------------------------------------------------
+ 

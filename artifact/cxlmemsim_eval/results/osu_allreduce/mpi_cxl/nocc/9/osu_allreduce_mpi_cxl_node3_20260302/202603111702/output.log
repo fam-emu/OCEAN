@@ -1,0 +1,608 @@
+/usr/local/bin/mpirun --allow-run-as-root -np 9 --map-by ppr:3:node -hostfile /root/hostfile3 -x CXL_SHIM_ALLOC=1 -x CXL_SHIM_COPY_SEND=1 -x CXL_SHIM_COPY_RECV=1 -x CXL_DAX_PATH=/dev/dax0.0 -x CXL_DAX_RESET=1 -x LD_PRELOAD=/root/gromacs-2026-03-10/libmpi_cxl_shim_nocc.so /root/osu-micro-benchmarks-7.4-ext/libexec/osu-micro-benchmarks/mpi/collective/osu_allreduce -m :65536 -i 200 2>&1 | tee -a ${LOG_DIR}/output.log
+
+┌──────────────────────────────────────────────────────────┐
+│    CXL MPI SHIM LIBRARY v3.0 - Remotable Pointer Edition  │
+├──────────────────────────────────────────────────────────┤
+│ Host: cxl-vm-01                                            │
+│ PID:  1224                                                 │
+│ Time: 1773248541                                           │
+├──────────────────────────────────────────────────────────┤
+│ FEATURES:                                                │
+│   - CXL Direct Send/Recv via shared DAX device          │
+│   - Remotable pointers (offset-based addressing)        │
+│   - Per-rank message queues in shared memory            │
+│   - Inline small messages (<4KB) optimization           │
+│   - Cache coherence: disabled (MPI_Barrier sync)        │
+├──────────────────────────────────────────────────────────┤
+│ CONFIGURATION:                                           │
+│   CXL_DAX_PATH: /dev/dax0.0                              │
+│   CXL_DIRECT: (auto for DAX)                             │
+│   CXL_SHIM_VERBOSE: NO                                   │
+│   CXL_SHIM_TRACE: NO                                     │
+│   CXL_DAX_RESET: YES                                     │
+└──────────────────────────────────────────────────────────┘
+
+[32m[CXL_SHIM:cxl-vm-01:1224:INFO] === MPI_Init HOOK CALLED (hook #1) ===
+[0m[32m[CXL_SHIM:cxl-vm-01:1224:INFO] Mapped DAX device /dev/dax0.0: 1054867456 bytes (1006 MB) at 0x100000000000 (FIXED)
+[0m
+┌──────────────────────────────────────────────────────────┐
+│    CXL MPI SHIM LIBRARY v3.0 - Remotable Pointer Edition  │
+├──────────────────────────────────────────────────────────┤
+│ Host: cxl-vm-01                                            │
+│ PID:  1226                                                 │
+│ Time: 1773248541                                           │
+├──────────────────────────────────────────────────────────┤
+│ FEATURES:                                                │
+│   - CXL Direct Send/Recv via shared DAX device          │
+│   - Remotable pointers (offset-based addressing)        │
+│   - Per-rank message queues in shared memory            │
+│   - Inline small messages (<4KB) optimization           │
+│   - Cache coherence: disabled (MPI_Barrier sync)        │
+├──────────────────────────────────────────────────────────┤
+│ CONFIGURATION:                                           │
+│   CXL_DAX_PATH: /dev/dax0.0                              │
+│   CXL_DIRECT: (auto for DAX)                             │
+│   CXL_SHIM_VERBOSE: NO                                   │
+│   CXL_SHIM_TRACE: NO                                     │
+│   CXL_DAX_RESET: YES                                     │
+└──────────────────────────────────────────────────────────┘
+
+[32m[CXL_SHIM:cxl-vm-01:1226:INFO] === MPI_Init HOOK CALLED (hook #1) ===
+[0m[32m[CXL_SHIM:cxl-vm-01:1226:INFO] Mapped DAX device /dev/dax0.0: 1054867456 bytes (1006 MB) at 0x100000000000 (FIXED)
+[0m[32m[CXL_SHIM:cxl-vm-01:1224:INFO] Reset DAX allocation counter
+[0m[32m[CXL_SHIM:cxl-vm-01:1224:INFO] Initializing CXL shared memory structures...
+[0m
+┌──────────────────────────────────────────────────────────┐
+│    CXL MPI SHIM LIBRARY v3.0 - Remotable Pointer Edition  │
+├──────────────────────────────────────────────────────────┤
+│ Host: cxl-vm-01                                            │
+│ PID:  1225                                                 │
+│ Time: 1773248541                                           │
+├──────────────────────────────────────────────────────────┤
+│ FEATURES:                                                │
+│   - CXL Direct Send/Recv via shared DAX device          │
+│   - Remotable pointers (offset-based addressing)        │
+│   - Per-rank message queues in shared memory            │
+│   - Inline small messages (<4KB) optimization           │
+│   - Cache coherence: disabled (MPI_Barrier sync)        │
+├──────────────────────────────────────────────────────────┤
+│ CONFIGURATION:                                           │
+│   CXL_DAX_PATH: /dev/dax0.0                              │
+│   CXL_DIRECT: (auto for DAX)                             │
+│   CXL_SHIM_VERBOSE: NO                                   │
+│   CXL_SHIM_TRACE: NO                                     │
+│   CXL_DAX_RESET: YES                                     │
+└──────────────────────────────────────────────────────────┘
+
+[32m[CXL_SHIM:cxl-vm-01:1225:INFO] === MPI_Init HOOK CALLED (hook #1) ===
+[0m[32m[CXL_SHIM:cxl-vm-01:1225:INFO] Mapped DAX device /dev/dax0.0: 1054867456 bytes (1006 MB) at 0x100000000000 (FIXED)
+[0m[32m[CXL_SHIM:cxl-vm-01:1226:INFO] Reset DAX allocation counter
+[0m[32m[CXL_SHIM:cxl-vm-01:1226:INFO] Initializing CXL shared memory structures...
+[0m[32m[CXL_SHIM:cxl-vm-01:1225:INFO] Reset DAX allocation counter
+[0m[32m[CXL_SHIM:cxl-vm-01:1225:INFO] Initializing CXL shared memory structures...
+[0m
+┌──────────────────────────────────────────────────────────┐
+│    CXL MPI SHIM LIBRARY v3.0 - Remotable Pointer Edition  │
+├──────────────────────────────────────────────────────────┤
+│ Host: cxl-vm-02                                            │
+│ PID:  1250                                                 │
+│ Time: 1773248541                                           │
+├──────────────────────────────────────────────────────────┤
+│ FEATURES:                                                │
+│   - CXL Direct Send/Recv via shared DAX device          │
+│   - Remotable pointers (offset-based addressing)        │
+│   - Per-rank message queues in shared memory            │
+│   - Inline small messages (<4KB) optimization           │
+│   - Cache coherence: disabled (MPI_Barrier sync)        │
+├──────────────────────────────────────────────────────────┤
+│ CONFIGURATION:                                           │
+│   CXL_DAX_PATH: /dev/dax0.0                              │
+│   CXL_DIRECT: (auto for DAX)                             │
+│   CXL_SHIM_VERBOSE: NO                                   │
+│   CXL_SHIM_TRACE: NO                                     │
+│   CXL_DAX_RESET: YES                                     │
+└──────────────────────────────────────────────────────────┘
+
+[32m[CXL_SHIM:cxl-vm-02:1250:INFO] === MPI_Init HOOK CALLED (hook #1) ===
+[0m[32m[CXL_SHIM:cxl-vm-02:1250:INFO] Mapped DAX device /dev/dax0.0: 1054867456 bytes (1006 MB) at 0x100000000000 (FIXED)
+[0m[32m[CXL_SHIM:cxl-vm-02:1250:INFO] Reset DAX allocation counter
+[0m[32m[CXL_SHIM:cxl-vm-02:1250:INFO] Initializing CXL shared memory structures...
+[0m
+┌──────────────────────────────────────────────────────────┐
+│    CXL MPI SHIM LIBRARY v3.0 - Remotable Pointer Edition  │
+├──────────────────────────────────────────────────────────┤
+│ Host: cxl-vm-03                                            │
+│ PID:  866                                                  │
+│ Time: 1773248542                                           │
+├──────────────────────────────────────────────────────────┤
+│ FEATURES:                                                │
+│   - CXL Direct Send/Recv via shared DAX device          │
+│   - Remotable pointers (offset-based addressing)        │
+│   - Per-rank message queues in shared memory            │
+│   - Inline small messages (<4KB) optimization           │
+│   - Cache coherence: disabled (MPI_Barrier sync)        │
+├──────────────────────────────────────────────────────────┤
+│ CONFIGURATION:                                           │
+│   CXL_DAX_PATH: /dev/dax0.0                              │
+│   CXL_DIRECT: (auto for DAX)                             │
+│   CXL_SHIM_VERBOSE: NO                                   │
+│   CXL_SHIM_TRACE: NO                                     │
+│   CXL_DAX_RESET: YES                                     │
+└──────────────────────────────────────────────────────────┘
+
+[32m[CXL_SHIM:cxl-vm-03:866:INFO] === MPI_Init HOOK CALLED (hook #1) ===
+[0m[32m[CXL_SHIM:cxl-vm-03:866:INFO] Mapped DAX device /dev/dax0.0: 1054867456 bytes (1006 MB) at 0x100000000000 (FIXED)
+[0m
+┌──────────────────────────────────────────────────────────┐
+│    CXL MPI SHIM LIBRARY v3.0 - Remotable Pointer Edition  │
+├──────────────────────────────────────────────────────────┤
+│ Host: cxl-vm-03                                            │
+│ PID:  867                                                  │
+│ Time: 1773248542                                           │
+├──────────────────────────────────────────────────────────┤
+│ FEATURES:                                                │
+│   - CXL Direct Send/Recv via shared DAX device          │
+│   - Remotable pointers (offset-based addressing)        │
+│   - Per-rank message queues in shared memory            │
+│   - Inline small messages (<4KB) optimization           │
+│   - Cache coherence: disabled (MPI_Barrier sync)        │
+├──────────────────────────────────────────────────────────┤
+│ CONFIGURATION:                                           │
+│   CXL_DAX_PATH: /dev/dax0.0                              │
+│   CXL_DIRECT: (auto for DAX)                             │
+│   CXL_SHIM_VERBOSE: NO                                   │
+│   CXL_SHIM_TRACE: NO                                     │
+│   CXL_DAX_RESET: YES                                     │
+└──────────────────────────────────────────────────────────┘
+
+[32m[CXL_SHIM:cxl-vm-03:867:INFO] === MPI_Init HOOK CALLED (hook #1) ===
+[0m[32m[CXL_SHIM:cxl-vm-03:867:INFO] Mapped DAX device /dev/dax0.0: 1054867456 bytes (1006 MB) at 0x100000000000 (FIXED)
+[0m
+┌──────────────────────────────────────────────────────────┐
+│    CXL MPI SHIM LIBRARY v3.0 - Remotable Pointer Edition  │
+├──────────────────────────────────────────────────────────┤
+│ Host: cxl-vm-03                                            │
+│ PID:  865                                                  │
+│ Time: 1773248542                                           │
+├──────────────────────────────────────────────────────────┤
+│ FEATURES:                                                │
+│   - CXL Direct Send/Recv via shared DAX device          │
+│   - Remotable pointers (offset-based addressing)        │
+│   - Per-rank message queues in shared memory            │
+│   - Inline small messages (<4KB) optimization           │
+│   - Cache coherence: disabled (MPI_Barrier sync)        │
+├──────────────────────────────────────────────────────────┤
+│ CONFIGURATION:                                           │
+│   CXL_DAX_PATH: /dev/dax0.0                              │
+│   CXL_DIRECT: (auto for DAX)                             │
+│   CXL_SHIM_VERBOSE: NO                                   │
+│   CXL_SHIM_TRACE: NO                                     │
+│   CXL_DAX_RESET: YES                                     │
+└──────────────────────────────────────────────────────────┘
+
+[32m[CXL_SHIM:cxl-vm-03:865:INFO] === MPI_Init HOOK CALLED (hook #1) ===
+[0m[32m[CXL_SHIM:cxl-vm-03:865:INFO] Mapped DAX device /dev/dax0.0: 1054867456 bytes (1006 MB) at 0x100000000000 (FIXED)
+[0m[32m[CXL_SHIM:cxl-vm-03:867:INFO] Reset DAX allocation counter
+[0m[32m[CXL_SHIM:cxl-vm-03:867:INFO] Initializing CXL shared memory structures...
+[0m[32m[CXL_SHIM:cxl-vm-03:866:INFO] Reset DAX allocation counter
+[0m[32m[CXL_SHIM:cxl-vm-03:866:INFO] Initializing CXL shared memory structures...
+[0m[32m[CXL_SHIM:cxl-vm-03:865:INFO] Reset DAX allocation counter
+[0m[32m[CXL_SHIM:cxl-vm-03:865:INFO] Initializing CXL shared memory structures...
+[0m
+┌──────────────────────────────────────────────────────────┐
+│    CXL MPI SHIM LIBRARY v3.0 - Remotable Pointer Edition  │
+├──────────────────────────────────────────────────────────┤
+│ Host: cxl-vm-02                                            │
+│ PID:  1251                                                 │
+│ Time: 1773248541                                           │
+├──────────────────────────────────────────────────────────┤
+│ FEATURES:                                                │
+│   - CXL Direct Send/Recv via shared DAX device          │
+│   - Remotable pointers (offset-based addressing)        │
+│   - Per-rank message queues in shared memory            │
+│   - Inline small messages (<4KB) optimization           │
+│   - Cache coherence: disabled (MPI_Barrier sync)        │
+├──────────────────────────────────────────────────────────┤
+│ CONFIGURATION:                                           │
+│   CXL_DAX_PATH: /dev/dax0.0                              │
+│   CXL_DIRECT: (auto for DAX)                             │
+│   CXL_SHIM_VERBOSE: NO                                   │
+│   CXL_SHIM_TRACE: NO                                     │
+│   CXL_DAX_RESET: YES                                     │
+└──────────────────────────────────────────────────────────┘
+
+[32m[CXL_SHIM:cxl-vm-02:1251:INFO] === MPI_Init HOOK CALLED (hook #1) ===
+[0m[32m[CXL_SHIM:cxl-vm-02:1251:INFO] Mapped DAX device /dev/dax0.0: 1054867456 bytes (1006 MB) at 0x100000000000 (FIXED)
+[0m[32m[CXL_SHIM:cxl-vm-02:1251:INFO] Reset DAX allocation counter
+[0m[32m[CXL_SHIM:cxl-vm-02:1251:INFO] Initializing CXL shared memory structures...
+[0m
+┌──────────────────────────────────────────────────────────┐
+│    CXL MPI SHIM LIBRARY v3.0 - Remotable Pointer Edition  │
+├──────────────────────────────────────────────────────────┤
+│ Host: cxl-vm-02                                            │
+│ PID:  1252                                                 │
+│ Time: 1773248541                                           │
+├──────────────────────────────────────────────────────────┤
+│ FEATURES:                                                │
+│   - CXL Direct Send/Recv via shared DAX device          │
+│   - Remotable pointers (offset-based addressing)        │
+│   - Per-rank message queues in shared memory            │
+│   - Inline small messages (<4KB) optimization           │
+│   - Cache coherence: disabled (MPI_Barrier sync)        │
+├──────────────────────────────────────────────────────────┤
+│ CONFIGURATION:                                           │
+│   CXL_DAX_PATH: /dev/dax0.0                              │
+│   CXL_DIRECT: (auto for DAX)                             │
+│   CXL_SHIM_VERBOSE: NO                                   │
+│   CXL_SHIM_TRACE: NO                                     │
+│   CXL_DAX_RESET: YES                                     │
+└──────────────────────────────────────────────────────────┘
+
+[32m[CXL_SHIM:cxl-vm-02:1252:INFO] === MPI_Init HOOK CALLED (hook #1) ===
+[0m[32m[CXL_SHIM:cxl-vm-02:1252:INFO] Mapped DAX device /dev/dax0.0: 1054867456 bytes (1006 MB) at 0x100000000000 (FIXED)
+[0m[32m[CXL_SHIM:cxl-vm-02:1252:INFO] Reset DAX allocation counter
+[0m[32m[CXL_SHIM:cxl-vm-02:1252:INFO] Initializing CXL shared memory structures...
+[0m[32m[CXL_SHIM:cxl-vm-03:866:INFO] CXL shared memory structures initialized (header_size=5279744 bytes, max_ranks=256)
+[0m[32m[CXL_SHIM:cxl-vm-03:866:INFO] CXL memory initialized: type=dax, size=1006 MB, base=0x100000000000, header=0x100000000000, mailboxes=0x100000000840
+[0m[32m[CXL_SHIM:cxl-vm-02:1250:INFO] CXL shared memory structures initialized (header_size=5279744 bytes, max_ranks=256)
+[0m[32m[CXL_SHIM:cxl-vm-02:1250:INFO] CXL memory initialized: type=dax, size=1006 MB, base=0x100000000000, header=0x100000000000, mailboxes=0x100000000840
+[0m[32m[CXL_SHIM:cxl-vm-02:1251:INFO] CXL shared memory structures initialized (header_size=5279744 bytes, max_ranks=256)
+[0m[32m[CXL_SHIM:cxl-vm-02:1251:INFO] CXL memory initialized: type=dax, size=1006 MB, base=0x100000000000, header=0x100000000000, mailboxes=0x100000000840
+[0m[32m[CXL_SHIM:cxl-vm-02:1252:INFO] CXL shared memory structures initialized (header_size=5279744 bytes, max_ranks=256)
+[0m[32m[CXL_SHIM:cxl-vm-02:1252:INFO] CXL memory initialized: type=dax, size=1006 MB, base=0x100000000000, header=0x100000000000, mailboxes=0x100000000840
+[0m[32m[CXL_SHIM:cxl-vm-03:865:INFO] CXL shared memory structures initialized (header_size=5279744 bytes, max_ranks=256)
+[0m[32m[CXL_SHIM:cxl-vm-03:865:INFO] CXL memory initialized: type=dax, size=1006 MB, base=0x100000000000, header=0x100000000000, mailboxes=0x100000000840
+[0m[32m[CXL_SHIM:cxl-vm-03:867:INFO] CXL shared memory structures initialized (header_size=5279744 bytes, max_ranks=256)
+[0m[32m[CXL_SHIM:cxl-vm-03:867:INFO] CXL memory initialized: type=dax, size=1006 MB, base=0x100000000000, header=0x100000000000, mailboxes=0x100000000840
+[0m[32m[CXL_SHIM:cxl-vm-01:1226:INFO] CXL shared memory structures initialized (header_size=5279744 bytes, max_ranks=256)
+[0m[32m[CXL_SHIM:cxl-vm-01:1226:INFO] CXL memory initialized: type=dax, size=1006 MB, base=0x100000000000, header=0x100000000000, mailboxes=0x100000000840
+[0m[32m[CXL_SHIM:cxl-vm-01:1225:INFO] CXL shared memory structures initialized (header_size=5279744 bytes, max_ranks=256)
+[0m[32m[CXL_SHIM:cxl-vm-01:1225:INFO] CXL memory initialized: type=dax, size=1006 MB, base=0x100000000000, header=0x100000000000, mailboxes=0x100000000840
+[0m[32m[CXL_SHIM:cxl-vm-01:1224:INFO] CXL shared memory structures initialized (header_size=5279744 bytes, max_ranks=256)
+[0m[32m[CXL_SHIM:cxl-vm-01:1224:INFO] CXL memory initialized: type=dax, size=1006 MB, base=0x100000000000, header=0x100000000000, mailboxes=0x100000000840
+[0m[32m[CXL_SHIM:cxl-vm-01:1225:INFO] Rank 1 resetting local CXL collective state
+[0m[32m[CXL_SHIM:cxl-vm-01:1224:INFO] Rank 0 resetting local CXL collective state
+[0m[32m[CXL_SHIM:cxl-vm-01:1226:INFO] Rank 2 resetting local CXL collective state
+[0m[32m[CXL_SHIM:cxl-vm-02:1250:INFO] Rank 3 resetting local CXL collective state
+[0m[32m[CXL_SHIM:cxl-vm-03:865:INFO] Rank 6 resetting local CXL collective state
+[0m[32m[CXL_SHIM:cxl-vm-02:1251:INFO] Rank 4 resetting local CXL collective state
+[0m[32m[CXL_SHIM:cxl-vm-03:866:INFO] Rank 7 resetting local CXL collective state
+[0m[32m[CXL_SHIM:cxl-vm-02:1252:INFO] [32m[CXL_SHIM:cxl-vm-03:867:INFO] Rank 8 resetting local CXL collective state
+[0mRank 5 resetting local CXL collective state
+[0m[32m[CXL_SHIM:cxl-vm-01:1225:INFO] [32m[CXL_SHIM:cxl-vm-01:1224:INFO] Registered rank 1/9 in CXL shared memory (pid=1225, host=cxl-vm-01, cxl_comm=enabled)
+[0m[32m[CXL_SHIM:cxl-vm-01:1226:INFO] [32m[CXL_SHIM:cxl-vm-02:1251:INFO] Registered rank 0/9 in CXL shared memory (pid=1224, host=cxl-vm-01, cxl_comm=enabled)
+[0mRegistered rank 2/9 in CXL shared memory (pid=1226, host=cxl-vm-01, cxl_comm=enabled)
+[0m[32m[CXL_SHIM:cxl-vm-03:865:INFO] [32m[CXL_SHIM:cxl-vm-02:1250:INFO] [32m[CXL_SHIM:cxl-vm-02:1252:INFO] [32m[CXL_SHIM:cxl-vm-03:866:INFO] Registered rank 7/9 in CXL shared memory (pid=866, host=cxl-vm-03, cxl_comm=enabled)
+[0mRegistered rank 4/9 in CXL shared memory (pid=1251, host=cxl-vm-02, cxl_comm=enabled)
+[0mRegistered rank 3/9 in CXL shared memory (pid=1250, host=cxl-vm-02, cxl_comm=enabled)
+[0mRegistered rank 5/9 in CXL shared memory (pid=1252, host=cxl-vm-02, cxl_comm=enabled)
+[0m[32m[CXL_SHIM:cxl-vm-03:867:INFO] Registered rank 6/9 in CXL shared memory (pid=865, host=cxl-vm-03, cxl_comm=enabled)
+[0mRegistered rank 8/9 in CXL shared memory (pid=867, host=cxl-vm-03, cxl_comm=enabled)
+[0m[32m[CXL_SHIM:cxl-vm-01:1225:INFO] [32m[CXL_SHIM:cxl-vm-01:1224:INFO] MPI_Init completed: rank=0/9, CXL=initialized, CXL_DIRECT=enabled
+[0m[32m[CXL_SHIM:cxl-vm-01:1226:INFO] MPI_Init completed: rank=2/9, CXL=initialized, CXL_DIRECT=enabled
+[0mMPI_Init completed: rank=1/9, CXL=initialized, CXL_DIRECT=enabled
+
+# OSU MPI Allreduce Latency Test v7.4
+# Datatype: MPI_CHAR.
+# Size       Avg Latency(us)
+[0m[32m[CXL_SHIM:cxl-vm-02:1251:INFO] MPI_Init completed: rank=4/9, CXL=initialized, CXL_DIRECT=enabled
+[0m[32m[CXL_SHIM:cxl-vm-03:866:INFO] MPI_Init completed: rank=7/9, CXL=initialized, CXL_DIRECT=enabled
+[0m[32m[CXL_SHIM:cxl-vm-02:1252:INFO] MPI_Init completed: rank=5/9, CXL=initialized, CXL_DIRECT=enabled
+[0m[32m[CXL_SHIM:cxl-vm-03:867:INFO] MPI_Init completed: rank=8/9, CXL=initialized, CXL_DIRECT=enabled
+[0m[32m[CXL_SHIM:cxl-vm-02:1250:INFO] MPI_Init completed: rank=3/9, CXL=initialized, CXL_DIRECT=enabled
+[0m[32m[CXL_SHIM:cxl-vm-03:865:INFO] MPI_Init completed: rank=6/9, CXL=initialized, CXL_DIRECT=enabled
+1                     702.78
+2                    1679.64
+4                    1603.34
+8                    1610.25
+16                   1624.78
+32                   1634.52
+64                   1744.55
+128                  1627.47
+256                  1653.94
+512                  1657.04
+1024                 1683.94
+2048                 1813.34
+4096                 2808.87
+8192                 3513.84
+16384                5745.20
+32768                9994.96
+65536               20712.25
+[0m[32m[CXL_SHIM:cxl-vm-01:1225:INFO] === MPI_Finalize HOOK CALLED ===
+[0m[32m[CXL_SHIM:cxl-vm-02:1250:INFO] === MPI_Finalize HOOK CALLED ===
+[0m[32m[CXL_SHIM:cxl-vm-03:865:INFO] === MPI_Finalize HOOK CALLED ===
+[0m[32m[CXL_SHIM:cxl-vm-03:865:INFO] [32m[CXL_SHIM:cxl-vm-01:1224:INFO] === MPI_Finalize HOOK CALLED ===
+[0m[32m[CXL_SHIM:cxl-vm-01:1226:INFO] === MPI_Finalize HOOK CALLED ===
+[0m[32m[CXL_SHIM:cxl-vm-02:1252:INFO] === MPI_Finalize HOOK CALLED ===
+[0m[32m[CXL_SHIM:cxl-vm-03:866:INFO] === MPI_Finalize HOOK CALLED ===
+[0m[32m[CXL_SHIM:cxl-vm-03:866:INFO] Deactivated rank 7 in CXL shared memory
+[0m[32m[CXL_SHIM:cxl-vm-02:1251:INFO] === MPI_Finalize HOOK CALLED ===
+[0m[32m[CXL_SHIM:cxl-vm-02:1252:INFO] Deactivated rank 5 in CXL shared memory
+[0m[32m[CXL_SHIM:cxl-vm-02:1251:INFO] Deactivated rank 4 in CXL shared memory
+[0m[32m[CXL_SHIM:cxl-vm-01:1225:INFO] Deactivated rank 1 in CXL shared memory
+[0m[32m[CXL_SHIM:cxl-vm-01:1224:INFO] Deactivated rank 0 in CXL shared memory
+[0m[32m[CXL_SHIM:cxl-vm-03:867:INFO] === MPI_Finalize HOOK CALLED ===
+[0m[32m[CXL_SHIM:cxl-vm-03:867:INFO] Deactivated rank 8 in CXL shared memory
+[0m[32m[CXL_SHIM:cxl-vm-02:1250:INFO] Deactivated rank 3 in CXL shared memory
+[0m[32m[CXL_SHIM:cxl-vm-01:1226:INFO] Deactivated rank 2 in CXL shared memory
+[0mDeactivated rank 6 in CXL shared memory
+[0m[32m[CXL_SHIM:cxl-vm-02:1252:INFO] Cleaning up CXL memory (used 5279744/1054867456 bytes, 0.5%)
+[0m[32m[CXL_SHIM:cxl-vm-02:1251:INFO] Cleaning up CXL memory (used 5279744/1054867456 bytes, 0.5%)
+[0m[32m[CXL_SHIM:cxl-vm-02:1250:INFO] Cleaning up CXL memory (used 5279744/1054867456 bytes, 0.5%)
+[0m[32m[CXL_SHIM:cxl-vm-03:867:INFO] Cleaning up CXL memory (used 5279744/1054867456 bytes, 0.5%)
+[0m[32m[CXL_SHIM:cxl-vm-03:866:INFO] Cleaning up CXL memory (used 5279744/1054867456 bytes, 0.5%)
+[0m[32m[CXL_SHIM:cxl-vm-03:865:INFO] Cleaning up CXL memory (used 5279744/1054867456 bytes, 0.5%)
+[0m
+[36m╔══════════════════════════════════════════════════════════╗
+║          CXL MPI Shim v3.0 — Statistics Summary          ║
+╠══════════════════════════════════════════════════════════╣[0m
+[32m  Point-to-Point:  0 total, 0 via CXL (0.0%)
+[0m    Send:          0 (CXL: 0, 0 bytes)
+    Recv:          0 (CXL: 0, 0 bytes)
+    Isend:         0 (CXL: 0)
+    Irecv:         0 (CXL: 0)
+    Sendrecv:      0
+[32m  Collectives:     9745 total, 0 via CXL (0.0%)
+[0m    Barrier:      4864
+    Bcast:           0 (CXL: 0, 0 bytes)
+    Reduce:         51
+    Allreduce:    4830 (CXL: 0, 28999380 bytes)
+    Allgather:       0 (CXL: 0)
+    Alltoall:        0 (CXL: 0)
+    Gather:          0 (CXL: 0)
+    Scatter:         0 (CXL: 0)
+[32m  RMA (One-Sided): 0 total, 0 via CXL (0.0%)
+[0m    Put:             0 (CXL: 0, 0 bytes)
+    Get:             0 (CXL: 0, 0 bytes)
+    Accumulate:      0
+    Win_fence:       0
+[32m  CXL Memory:
+[0m    Allocations: 0 (0 bytes)
+    Pool usage:  5279744 / 1054867456 bytes (0.5%)
+[36m╚══════════════════════════════════════════════════════════╝
+[0m[32m[CXL_SHIM:cxl-vm-02:1252:INFO] MPI_Finalize completed (total hooks: 1)
+[0m[32m[CXL_SHIM:cxl-vm-02:1252:INFO] CXL MPI Shim unloading (total hooks: 1)
+[0m
+[36m╔══════════════════════════════════════════════════════════╗
+║          CXL MPI Shim v3.0 — Statistics Summary          ║
+╠══════════════════════════════════════════════════════════╣[0m
+[32m  Point-to-Point:  0 total, 0 via CXL (0.0%)
+[0m    Send:          0 (CXL: 0, 0 bytes)
+    Recv:          0 (CXL: 0, 0 bytes)
+    Isend:         0 (CXL: 0)
+    Irecv:         0
+[36m╔══════════════════════════════════════════════════════════╗
+║          CXL MPI Shim v3.0 — Statistics Summary          ║
+╠══════════════════════════════════════════════════════════╣[0m
+[32m  Point-to-Point:  0 total, 0 via CXL (0.0%)
+[0m    Send:          0 (CXL: 0, 0 bytes)
+    Recv:          0 (CXL: 0, 0 bytes)
+    Isend:         0 (CXL: 0)
+    Irecv:         0 (CXL: 0)
+    Sendrecv:      0
+[32m  Collectives:     9745 total, 0 via CXL (0.0%)
+[0m    Barrier:      4864
+    Bcast:           0 (CXL: 0, 0 bytes)
+    Reduce:         51
+    Allreduce:    4830 (CXL: 0, 28999380 bytes)
+    Allgather:       0 (CXL: 0)
+    Alltoall:        0 (CXL: 0)
+    Gather:          0 (CXL: 0)
+    Scatter:         0 (CXL: 0)
+[32m  RMA (One-Sided): 0 total, 0 via CXL (0.0%)
+[0m    Put:             0 (CXL: 0, 0 bytes)
+    Get:             0 (CXL: 0, 0 bytes)
+    Accumulate:      0
+    Win_fence:       0
+[32m  CXL Memory:
+[0m    Allocations: 0 (0 bytes)
+    Pool usage:  5279744 / 1054867456 bytes (0.5%)
+[36m╚══════════════════════════════════════════════════════════╝
+[0m[32m[CXL_SHIM:cxl-vm-03:867:INFO] MPI_Finalize completed (total hooks: 1)
+[0m (CXL: 0)
+    Sendrecv:      0
+[32m  Collectives:     9745 total, 0 via CXL (0.0%)
+[0m    Barrier:      4864
+    Bcast:           0 (CXL: 0, 0 bytes)
+    Reduce:         51
+    Allreduce:    4830 (CXL: 0, 28999380 bytes)
+    Allgather:       0 (CXL: 0)
+    Alltoall:        0 (CXL: 0)
+    Gather:          0 (CXL: 0)
+    Scatter:         0 (CXL: 0)
+[32m  RMA (One-Sided): 0 total, 0 via CXL (0.0%)
+[0m    Put:             0 (CXL: 0, 0 bytes)
+    Get:             0 (CXL: 0, 0 bytes)
+    Accumulate:      0
+    Win_fence:       0
+[32m  CXL Memory:
+[0m    Allocations: 0 (0 bytes)
+    Pool usage:  5279744 / 1054867456 bytes (0.5%)
+[36m╚══════════════════════════════════════════════════════════╝
+[0m[32m[CXL_SHIM:cxl-vm-02:1250:INFO] MPI_Finalize completed (total hooks: 1)
+[0m[32m[CXL_SHIM:cxl-vm-02:1250:INFO] CXL MPI Shim unloading (total hooks: 1)
+[0m[32m[CXL_SHIM:cxl-vm-03:867:INFO] CXL MPI Shim unloading (total hooks: 1)
+[0m
+[36m╔══════════════════════════════════════════════════════════╗
+║          CXL MPI Shim v3.0 — Statistics Summary          ║
+╠══════════════════════════════════════════════════════════╣[0m
+[32m  Point-to-Point:  0 total, 0 via CXL (0.0%)
+[0m    Send:          0 (CXL: 0, 0 bytes)
+    Recv:          0 (CXL: 0, 0 bytes)
+    Isend:         0 (CXL: 0)
+    Irecv:         0 (CXL: 0)
+    Sendrecv:      0
+[32m  Collectives:     9745 total, 0 via CXL (0.0%)
+[0m    Barrier:      4864
+    Bcast:           0 (CXL: 0, 0 bytes)
+    Reduce:         51
+    Allreduce:    4830 (CXL: 0, 28999380 bytes)
+    Allgather:       0 (CXL: 0)
+    Alltoall:        0 (CXL: 0)
+    Gather:          0 (CXL: 0)
+    Scatter:         0 (CXL: 0)
+[32m  RMA (One-Sided): 0 total, 0 via CXL (0.0%)
+[0m    Put:             0 (CXL: 0, 0 bytes)
+    Get:             0 (CXL: 0, 0 bytes)
+    Accumulate:      0
+    Win_fence:       0
+[32m  CXL Memory:
+[0m    Allocations: 0 (0 bytes)
+    Pool usage:  5279744 / 1054867456 bytes (0.5%)
+[36m╚══════════════════════════════════════════════════════════╝
+[0m[32m[CXL_SHIM:cxl-vm-03:865:INFO] MPI_Finalize completed (total hooks: 1)
+[0m[32m[CXL_SHIM:cxl-vm-03:865:INFO] CXL MPI Shim unloading (total hooks: 1)
+[0m
+[36m╔══════════════════════════════════════════════════════════╗
+║          CXL MPI Shim v3.0 — Statistics Summary          ║
+╠══════════════════════════════════════════════════════════╣[0m
+[32m  Point-to-Point:  0 total, 0 via CXL (0.0%)
+[0m    Send:          0 (CXL: 0, 0 bytes)
+    Recv:          0 (CXL: 0, 0 bytes)
+    Isend:         0 (CXL: 0)
+    Irecv:         0 (CXL: 0)
+    Sendrecv:      0
+[32m  Collectives:     9745 total, 0 via CXL (0.0%)
+[0m    Barrier:      4864
+    Bcast:           0 (CXL: 0, 0 bytes)
+    Reduce:         51
+    Allreduce:    4830 (CXL: 0, 28999380 bytes)
+    Allgather:       0 (CXL: 0)
+    Alltoall:        0 (CXL: 0)
+    Gather:          0 (CXL: 0)
+    Scatter:         0 (CXL: 0)
+[32m  RMA (One-Sided): 0 total, 0 via CXL (0.0%)
+[0m    Put:             0 (CXL: 0, 0 bytes)
+    Get:             0 (CXL: 0, 0 bytes)
+    Accumulate:      0
+    Win_fence:       0
+[32m  CXL Memory:
+[0m    Allocations: 0 (0 bytes)
+    Pool usage:  5279744 / 1054867456 bytes (0.5%)
+[36m╚══════════════════════════════════════════════════════════╝
+[0m[32m[CXL_SHIM:cxl-vm-02:1251:INFO] MPI_Finalize completed (total hooks: 1)
+[0m[32m[CXL_SHIM:cxl-vm-02:1251:INFO] CXL MPI Shim unloading (total hooks: 1)
+[0m
+[36m╔══════════════════════════════════════════════════════════╗
+║          CXL MPI Shim v3.0 — Statistics Summary          ║
+╠══════════════════════════════════════════════════════════╣[0m
+[32m  Point-to-Point:  0 total, 0 via CXL (0.0%)
+[0m    Send:          0 (CXL: 0, 0 bytes)
+    Recv:          0 (CXL: 0, 0 bytes)
+    Isend:         0 (CXL: 0)
+    Irecv:         0 (CXL: 0)
+    Sendrecv:      0
+[32m  Collectives:     9745 total, 0 via CXL (0.0%)
+[0m    Barrier:      4864
+    Bcast:           0 (CXL: 0, 0 bytes)
+    Reduce:         51
+    Allreduce:    4830 (CXL: 0, 28999380 bytes)
+    Allgather:       0 (CXL: 0)
+    Alltoall:        0 (CXL: 0)
+    Gather:          0 (CXL: 0)
+    Scatter:         0 (CXL: 0)
+[32m  RMA (One-Sided): 0 total, 0 via CXL (0.0%)
+[0m    Put:             0 (CXL: 0, 0 bytes)
+    Get:             0 (CXL: 0, 0 bytes)
+    Accumulate:      0
+    Win_fence:       0
+[32m  CXL Memory:
+[0m    Allocations: 0 (0 bytes)
+    Pool usage:  5279744 / 1054867456 bytes (0.5%)
+[36m╚══════════════════════════════════════════════════════════╝
+[0m[32m[CXL_SHIM:cxl-vm-03:866:INFO] MPI_Finalize completed (total hooks: 1)
+[0m[32m[CXL_SHIM:cxl-vm-03:866:INFO] CXL MPI Shim unloading (total hooks: 1)
+[0m[32m[CXL_SHIM:cxl-vm-01:1225:INFO] Cleaning up CXL memory (used 5279744/1054867456 bytes, 0.5%)
+[0m
+[36m╔══════════════════════════════════════════════════════════╗
+║          CXL MPI Shim v3.0 — Statistics Summary          ║
+╠══════════════════════════════════════════════════════════╣[0m
+[32m  Point-to-Point:  0 total, 0 via CXL (0.0%)
+[0m    Send:          0 (CXL: 0, 0 bytes)
+    Recv:          0 (CXL: 0, 0 bytes)
+    Isend:         0 (CXL: 0)
+    Irecv:         0 (CXL: 0)
+    Sendrecv:      0
+[32m  Collectives:     9745 total, 0 via CXL (0.0%)
+[0m    Barrier:      4864
+    Bcast:           0 (CXL: 0, 0 bytes)
+    Reduce:         51
+    Allreduce:    4830 (CXL: 0, 28999380 bytes)
+    Allgather:       0 (CXL: 0)
+    Alltoall:        0 (CXL: 0)
+    Gather:          0 (CXL: 0)
+    Scatter:         0 (CXL: 0)
+[32m  RMA (One-Sided): 0 total, 0 via CXL (0.0%)
+[0m    Put:             0 (CXL: 0, 0 bytes)
+    Get:             0 (CXL: 0, 0 bytes)
+    Accumulate:      0
+    Win_fence:       0
+[32m  CXL Memory:
+[0m    Allocations: 0 (0 bytes)
+    Pool usage:  5279744 / 1054867456 bytes (0.5%)
+[36m╚══════════════════════════════════════════════════════════╝
+[0m[32m[CXL_SHIM:cxl-vm-01:1225:INFO] MPI_Finalize completed (total hooks: 1)
+[0m[32m[CXL_SHIM:cxl-vm-01:1225:INFO] CXL MPI Shim unloading (total hooks: 1)
+[0m[32m[CXL_SHIM:cxl-vm-01:1224:INFO] Cleaning up CXL memory (used 5279744/1054867456 bytes, 0.5%)
+[0m
+[36m╔══════════════════════════════════════════════════════════╗
+║          CXL MPI Shim v3.0 — Statistics Summary          ║
+╠══════════════════════════════════════════════════════════╣[0m
+[32m  Point-to-Point:  0 total, 0 via CXL (0.0%)
+[0m    Send:          0 (CXL: 0, 0 bytes)
+    Recv:          0 (CXL: 0, 0 bytes)
+    Isend:         0 (CXL: 0)
+    Irecv:         0 (CXL: 0)
+    Sendrecv:      0
+[32m  Collectives:     9745 total, 0 via CXL (0.0%)
+[0m    Barrier:      4864
+    Bcast:           0 (CXL: 0, 0 bytes)
+    Reduce:         51
+    Allreduce:    4830 (CXL: 0, 28999380 bytes)
+    Allgather:       0 (CXL: 0)
+    Alltoall:        0 (CXL: 0)
+    Gather:          0 (CXL: 0)
+    Scatter:         0 (CXL: 0)
+[32m  RMA (One-Sided): 0 total, 0 via CXL (0.0%)
+[0m    Put:             0 (CXL: 0, 0 bytes)
+    Get:             0 (CXL: 0, 0 bytes)
+    Accumulate:      0
+    Win_fence:       0
+[32m  CXL Memory:
+[0m    Allocations: 0 (0 bytes)
+    Pool usage:  5279744 / 1054867456 bytes (0.5%)
+[36m╚══════════════════════════════════════════════════════════╝
+[0m[32m[CXL_SHIM:cxl-vm-01:1224:INFO] MPI_Finalize completed (total hooks: 1)
+[0m[32m[CXL_SHIM:cxl-vm-01:1224:INFO] CXL MPI Shim unloading (total hooks: 1)
+[0m[32m[CXL_SHIM:cxl-vm-01:1226:INFO] Cleaning up CXL memory (used 5279744/1054867456 bytes, 0.5%)
+[0m
+[36m╔══════════════════════════════════════════════════════════╗
+║          CXL MPI Shim v3.0 — Statistics Summary          ║
+╠══════════════════════════════════════════════════════════╣[0m
+[32m  Point-to-Point:  0 total, 0 via CXL (0.0%)
+[0m    Send:          0 (CXL: 0, 0 bytes)
+    Recv:          0 (CXL: 0, 0 bytes)
+    Isend:         0 (CXL: 0)
+    Irecv:         0 (CXL: 0)
+    Sendrecv:      0
+[32m  Collectives:     9745 total, 0 via CXL (0.0%)
+[0m    Barrier:      4864
+    Bcast:           0 (CXL: 0, 0 bytes)
+    Reduce:         51
+    Allreduce:    4830 (CXL: 0, 28999380 bytes)
+    Allgather:       0 (CXL: 0)
+    Alltoall:        0 (CXL: 0)
+    Gather:          0 (CXL: 0)
+    Scatter:         0 (CXL: 0)
+[32m  RMA (One-Sided): 0 total, 0 via CXL (0.0%)
+[0m    Put:             0 (CXL: 0, 0 bytes)
+    Get:             0 (CXL: 0, 0 bytes)
+    Accumulate:      0
+    Win_fence:       0
+[32m  CXL Memory:
+[0m    Allocations: 0 (0 bytes)
+    Pool usage:  5279744 / 1054867456 bytes (0.5%)
+[36m╚══════════════════════════════════════════════════════════╝
+[0m[32m[CXL_SHIM:cxl-vm-01:1226:INFO] MPI_Finalize completed (total hooks: 1)
+[0m[32m[CXL_SHIM:cxl-vm-01:1226:INFO] CXL MPI Shim unloading (total hooks: 1)
+[0m

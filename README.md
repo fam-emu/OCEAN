@@ -96,3 +96,6 @@ export CXL_DAX_RESET=1  # Reset allocation counter on first process
 export CXL_SHIM_VERBOSE=1
 LD_PRELOAD=/root/libmpi_cxl_shim.so mpirun --allow-run-as-root -np 2 -hostfile hostfile -x CXL_DAX_PATH -x CXL_DAX_RESET -x CXL_SHIM_VERBOSE -x LD_PRELOAD ~/osu-micro-benchmarks/mpi/collective/osu_allgather
 ```
+
+## Troubleshooting
+If the QEMU image and the modified linux kernel download links do not work, they can be also found in Google Drive: https://drive.google.com/drive/folders/15r2wxoU_WFa06n1nBVlafg-69PimOH04?usp=sharing

@@ -10,6 +10,7 @@ DISK_IMAGE=${DISK_IMAGE:-plucky-server-cloudimg-amd64.img}
 # Enable SHM mode with lock-free coherency
 export CXL_TRANSPORT_MODE=shm
 export CXL_HOST_ID=0
+export CXL_LATENCY_INJECT=1
 $QEMU_BINARY \
     --enable-kvm -cpu qemu64,+xsave,+rdtscp,+avx,+avx2,+sse4.1,+sse4.2,+avx512f,+avx512dq,+avx512ifma,+avx512cd,+avx512bw,+avx512vl,+avx512vbmi,+clflushopt  \
     -m 16G,maxmem=32G,slots=8 \

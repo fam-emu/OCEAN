@@ -498,6 +498,7 @@ DistributedMemoryServer::DistributedMemoryServer(uint32_t node_id, const std::st
       memory_capacity_mb_(capacity_mb), transport_mode_(transport_mode),
       tcp_addr_(tcp_addr), tcp_transport_port_(tcp_transport_port),
       controller_(controller),
+      lsa_coordinator_port_(static_cast<uint16_t>(tcp_port)),
       lsa_size_(256 * 1024),  /* 256KB default LSA size per CXL spec */
       tcp_server_fd_(-1), next_client_id_(0),
       running_(false), state_(NODE_STATE_UNKNOWN),
@@ -776,6 +777,28 @@ void DistributedMemoryServer::setup_message_handlers() {
     msg_manager_->register_handler(DIST_MSG_WRITE_REQ,
         [this](const dist_message_t& req, dist_message_t& resp) {
             handle_write_request(req, resp);
+        });
+
+    // Global LSA handlers. Node 0 is the authoritative LSA owner; these
+    // handlers service forwarded LSA requests without recursively forwarding.
+    msg_manager_->register_handler(DIST_MSG_LSA_READ_REQ,
+        [this](const dist_message_t& req, dist_message_t& resp) {
+            resp.header.msg_type = DIST_MSG_LSA_READ_RESP;
+            uint64_t size = std::min(req.payload.mem.size,
+                                     static_cast<uint64_t>(sizeof(resp.payload.mem.data)));
+            int ret = lsa_read_local(req.payload.mem.addr, resp.payload.mem.data, size);
+            resp.payload.mem.status = (ret == 0) ? 0 : 1;
+            resp.payload.mem.size = size;
+        });
+
+    msg_manager_->register_handler(DIST_MSG_LSA_WRITE_REQ,
+        [this](const dist_message_t& req, dist_message_t& resp) {
+            resp.header.msg_type = DIST_MSG_LSA_WRITE_RESP;
+            uint64_t size = std::min(req.payload.mem.size,
+                                     static_cast<uint64_t>(sizeof(req.payload.mem.data)));
+            int ret = lsa_write_local(req.payload.mem.addr, req.payload.mem.data, size);
+            resp.payload.mem.status = (ret == 0) ? 0 : 1;
+            resp.payload.mem.size = size;
         });
 
     // Atomic FAA handler
@@ -1270,6 +1293,20 @@ void DistributedMemoryServer::fence() {
 }
 
 int DistributedMemoryServer::lsa_read(uint64_t offset, void* data, size_t size) {
+    if (node_id_ != 0) {
+        return forward_lsa_to_coordinator(DIST_OP_LSA_READ, offset, nullptr, data, size);
+    }
+    return lsa_read_local(offset, data, size);
+}
+
+int DistributedMemoryServer::lsa_write(uint64_t offset, const void* data, size_t size) {
+    if (node_id_ != 0) {
+        return forward_lsa_to_coordinator(DIST_OP_LSA_WRITE, offset, data, nullptr, size);
+    }
+    return lsa_write_local(offset, data, size);
+}
+
+int DistributedMemoryServer::lsa_read_local(uint64_t offset, void* data, size_t size) {
     std::lock_guard<std::mutex> lock(lsa_mutex_);
     if (offset + size > lsa_size_) {
         SPDLOG_ERROR("Node {} LSA read out of bounds: offset=0x{:x} size={} lsa_size={}",
@@ -1280,7 +1317,7 @@ int DistributedMemoryServer::lsa_read(uint64_t offset, void* data, size_t size) 
     return 0;
 }
 
-int DistributedMemoryServer::lsa_write(uint64_t offset, const void* data, size_t size) {
+int DistributedMemoryServer::lsa_write_local(uint64_t offset, const void* data, size_t size) {
     std::lock_guard<std::mutex> lock(lsa_mutex_);
     if (offset + size > lsa_size_) {
         /* Auto-grow LSA if needed */
@@ -1290,6 +1327,127 @@ int DistributedMemoryServer::lsa_write(uint64_t offset, const void* data, size_t
         lsa_size_ = new_size;
     }
     memcpy(lsa_data_.data() + offset, data, size);
+    return 0;
+}
+
+int DistributedMemoryServer::forward_lsa_to_coordinator(uint8_t op_type, uint64_t offset,
+                                                        const void* write_data,
+                                                        void* read_data, size_t size) {
+    uint64_t clamped_size = std::min(static_cast<uint64_t>(size), static_cast<uint64_t>(64));
+
+    if (msg_manager_) {
+        dist_message_t req, resp;
+        memset(&req, 0, sizeof(req));
+        req.header.msg_type = (op_type == DIST_OP_LSA_READ)
+            ? DIST_MSG_LSA_READ_REQ : DIST_MSG_LSA_WRITE_REQ;
+        req.header.msg_id = generate_msg_id();
+        req.header.src_node_id = node_id_;
+        req.header.dst_node_id = 0;
+        req.header.timestamp = std::chrono::steady_clock::now().time_since_epoch().count();
+        req.payload.mem.addr = offset;
+        req.payload.mem.size = clamped_size;
+        req.payload.mem.client_id = node_id_;
+        if (op_type == DIST_OP_LSA_WRITE && write_data) {
+            memcpy(req.payload.mem.data, write_data, clamped_size);
+        }
+
+        if (!msg_manager_->send_message_wait_response(0, req, resp) ||
+            resp.payload.mem.status != 0) {
+            SPDLOG_ERROR("Node {} failed to forward LSA op {} to coordinator via SHM",
+                         node_id_, static_cast<int>(op_type));
+            return -1;
+        }
+
+        if (op_type == DIST_OP_LSA_READ && read_data) {
+            memcpy(read_data, resp.payload.mem.data, clamped_size);
+        }
+        return 0;
+    }
+
+    if (lsa_coordinator_addr_.empty()) {
+        SPDLOG_ERROR("Node {} has no LSA coordinator address; configure --tcp-peers with node 0",
+                     node_id_);
+        return -1;
+    }
+
+    int fd = socket(AF_INET, SOCK_STREAM, 0);
+    if (fd < 0) {
+        SPDLOG_ERROR("Node {} failed to create LSA forwarding socket: {}",
+                     node_id_, strerror(errno));
+        return -1;
+    }
+
+    sockaddr_in addr{};
+    addr.sin_family = AF_INET;
+    addr.sin_port = htons(lsa_coordinator_port_);
+    if (inet_pton(AF_INET, lsa_coordinator_addr_.c_str(), &addr.sin_addr) <= 0) {
+        SPDLOG_ERROR("Node {} invalid LSA coordinator address: {}", node_id_,
+                     lsa_coordinator_addr_);
+        close(fd);
+        return -1;
+    }
+
+    if (connect(fd, reinterpret_cast<sockaddr*>(&addr), sizeof(addr)) < 0) {
+        SPDLOG_ERROR("Node {} failed to connect to LSA coordinator {}:{}: {}",
+                     node_id_, lsa_coordinator_addr_, lsa_coordinator_port_,
+                     strerror(errno));
+        close(fd);
+        return -1;
+    }
+
+    auto send_all = [](int sock, const void* buffer, size_t len) {
+        const uint8_t* ptr = static_cast<const uint8_t*>(buffer);
+        while (len > 0) {
+            ssize_t sent = send(sock, ptr, len, MSG_NOSIGNAL);
+            if (sent < 0) {
+                if (errno == EINTR) continue;
+                return false;
+            }
+            if (sent == 0) return false;
+            ptr += sent;
+            len -= sent;
+        }
+        return true;
+    };
+
+    auto recv_all = [](int sock, void* buffer, size_t len) {
+        uint8_t* ptr = static_cast<uint8_t*>(buffer);
+        while (len > 0) {
+            ssize_t received = recv(sock, ptr, len, 0);
+            if (received < 0) {
+                if (errno == EINTR) continue;
+                return false;
+            }
+            if (received == 0) return false;
+            ptr += received;
+            len -= received;
+        }
+        return true;
+    };
+
+    DistServerRequest req{};
+    DistServerResponse resp{};
+    req.op_type = op_type;
+    req.addr = offset;
+    req.size = clamped_size;
+    req.timestamp = std::chrono::steady_clock::now().time_since_epoch().count();
+    if (op_type == DIST_OP_LSA_WRITE && write_data) {
+        memcpy(req.data, write_data, clamped_size);
+    }
+
+    bool ok = send_all(fd, &req, sizeof(req)) &&
+              recv_all(fd, &resp, sizeof(resp));
+    close(fd);
+
+    if (!ok || resp.status != 0) {
+        SPDLOG_ERROR("Node {} LSA coordinator RPC failed for op {} at offset 0x{:x}",
+                     node_id_, static_cast<int>(op_type), offset);
+        return -1;
+    }
+
+    if (op_type == DIST_OP_LSA_READ && read_data) {
+        memcpy(read_data, resp.data, clamped_size);
+    }
     return 0;
 }
 
@@ -1410,6 +1568,13 @@ bool DistributedMemoryServer::connect_tcp_node(uint32_t node_id, const std::stri
     }
 
     SPDLOG_INFO("TCP connected to node {} at {}:{}", node_id, addr, port);
+
+    if (node_id_ != 0 && node_id == 0) {
+        lsa_coordinator_addr_ = addr;
+        lsa_coordinator_port_ = static_cast<uint16_t>(tcp_port_);
+        SPDLOG_INFO("Node {} will forward LSA RPCs to coordinator {}:{}",
+                    node_id_, lsa_coordinator_addr_, lsa_coordinator_port_);
+    }
 
     // Create virtual endpoint for the remote node
     uint64_t peer_capacity = memory_capacity_mb_ * 1024ULL * 1024ULL; // Assume same capacity

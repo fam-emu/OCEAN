@@ -81,6 +81,12 @@ typedef enum {
     DIST_MSG_BULK_READ_RESP = 51,
     DIST_MSG_BULK_WRITE_REQ = 52,
     DIST_MSG_BULK_WRITE_RESP = 53,
+
+    /* Global LSA operations */
+    DIST_MSG_LSA_READ_REQ = 60,
+    DIST_MSG_LSA_READ_RESP = 61,
+    DIST_MSG_LSA_WRITE_REQ = 62,
+    DIST_MSG_LSA_WRITE_RESP = 63,
 } dist_msg_type_t;
 
 /* Node states */
@@ -539,6 +545,10 @@ private:
     std::unique_ptr<DistributedMessageManager> msg_manager_;
     std::unique_ptr<DistributedTCPTransport> tcp_transport_;
 
+    /* Coordinator-owned LSA forwarding */
+    std::string lsa_coordinator_addr_;
+    uint16_t lsa_coordinator_port_;
+
     /* Node registry */
     std::map<uint32_t, DistNodeInfo> nodes_;
     mutable std::shared_mutex nodes_mutex_;
@@ -666,6 +676,13 @@ private:
     /* Coherency */
     bool ensure_coherency_for_read(uint64_t addr, uint32_t requesting_node);
     bool ensure_coherency_for_write(uint64_t addr, uint32_t requesting_node);
+
+    /* LSA forwarding */
+    int lsa_read_local(uint64_t offset, void* data, size_t size);
+    int lsa_write_local(uint64_t offset, const void* data, size_t size);
+    int forward_lsa_to_coordinator(uint8_t op_type, uint64_t offset,
+                                   const void* write_data, void* read_data,
+                                   size_t size);
 
     /* TCP initialization helpers */
     bool initialize_tcp_transport();

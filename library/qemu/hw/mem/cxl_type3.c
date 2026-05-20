@@ -1953,8 +1953,8 @@ MemTxResult cxl_type3_read(PCIDevice *d, hwaddr host_addr, uint64_t *data,
         return MEMTX_OK;
     }
 
-    /* Forward to CXLMemSim if enabled */
-    if (g_memsim.enabled && g_memsim.connected) {
+    /* Forward to CXLMemSim if enabled. The request helper connects lazily. */
+    if (g_memsim.enabled) {
         CXLMemSimResponse resp = {0};
 
         /* Record wall-clock time before IPC for latency compensation */
@@ -2010,8 +2010,8 @@ MemTxResult cxl_type3_write(PCIDevice *d, hwaddr host_addr, uint64_t data,
         return MEMTX_OK;
     }
 
-    /* Forward to CXLMemSim if enabled */
-    if (g_memsim.enabled && g_memsim.connected) {
+    /* Forward to CXLMemSim if enabled. The request helper connects lazily. */
+    if (g_memsim.enabled) {
         CXLMemSimResponse resp = {0};
 
         /* Record wall-clock time before IPC for latency compensation */
@@ -2115,8 +2115,10 @@ static uint64_t get_lsa(CXLType3Dev *ct3d, void *buf, uint64_t size,
         return 0;
     }
 
-    /* Route LSA reads through CXLMemSim server when connected */
-    if (g_memsim.enabled && g_memsim.connected &&
+    cxl_memsim_init();
+
+    /* Route LSA reads through CXLMemSim server in RPC transports. */
+    if (g_memsim.enabled &&
         (g_memsim.transport_mode == CXL_TRANSPORT_TCP ||
          g_memsim.transport_mode == CXL_TRANSPORT_RDMA)) {
         uint64_t remaining = size;
@@ -2162,8 +2164,10 @@ static void set_lsa(CXLType3Dev *ct3d, const void *buf, uint64_t size,
         return;
     }
 
-    /* Route LSA writes through CXLMemSim server when connected */
-    if (g_memsim.enabled && g_memsim.connected &&
+    cxl_memsim_init();
+
+    /* Route LSA writes through CXLMemSim server in RPC transports. */
+    if (g_memsim.enabled &&
         (g_memsim.transport_mode == CXL_TRANSPORT_TCP ||
          g_memsim.transport_mode == CXL_TRANSPORT_RDMA)) {
         uint64_t remaining = size;

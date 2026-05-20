@@ -1,14 +1,14 @@
 #!/bin/bash
 
 QEMU_BINARY=/usr/local/bin/qemu-system-x86_64
-CXL_MEMSIM_HOST=${CXL_MEMSIM_HOST:-127.0.0.1}
-CXL_MEMSIM_PORT=${CXL_MEMSIM_PORT:-9999}
+export CXL_MEMSIM_HOST=${CXL_MEMSIM_HOST:-127.0.0.1}
+export CXL_MEMSIM_PORT=${CXL_MEMSIM_PORT:-9999}
 VM_MEMORY=${VM_MEMORY:-2G}
 CXL_MEMORY=${CXL_MEMORY:-4G}
 DISK_IMAGE=${DISK_IMAGE:-plucky-server-cloudimg-amd64.img}
 
-# Enable SHM mode with lock-free coherency
-export CXL_TRANSPORT_MODE=shm
+# Route QEMU CXL.mem/LSA traffic through the TCP RPC backend by default.
+export CXL_TRANSPORT_MODE=${CXL_TRANSPORT_MODE:-tcp}
 export CXL_HOST_ID=0
 export CXL_LATENCY_INJECT=1
 $QEMU_BINARY \

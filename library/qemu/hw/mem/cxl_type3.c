@@ -33,6 +33,7 @@
 #include <arpa/inet.h>
 #include <pthread.h>
 #include "hw/cxl/cxl.h"
+#include "hw/cxl/cxl_memsim_browser.h"
 #include "hw/pci/msix.h"
 
 /* type3 device private */
@@ -1332,7 +1333,8 @@ typedef struct __attribute__((aligned(64))) {
 enum CXLTransportMode {
     CXL_TRANSPORT_TCP = 0,
     CXL_TRANSPORT_RDMA = 1,
-    CXL_TRANSPORT_SHM = 2
+    CXL_TRANSPORT_SHM = 2,
+    CXL_TRANSPORT_BROWSER = 3
 };
 
 /* Include RDMA support header */
@@ -1463,6 +1465,8 @@ static void cxl_memsim_init(void) {
     }
     const char *rdma_server = getenv("CXL_MEMSIM_RDMA_SERVER");
     const char *rdma_port = getenv("CXL_MEMSIM_RDMA_PORT");
+    const char *browser_pool = getenv("CXL_MEMSIM_POOL");
+    const char *browser_env = getenv("CXL_MEMSIM_BROWSER");
 
     if (!host || !host[0]) {
         host = CXL_MEMSIM_DEFAULT_HOST;
@@ -1477,6 +1481,13 @@ static void cxl_memsim_init(void) {
     if (!transport || !transport[0]) {
         transport = "shm";
     }
+
+    bool browser_requested =
+        cxl_memsim_transport_is_browser(transport) ||
+        (browser_env && (strcmp(browser_env, "1") == 0 ||
+                         strcmp(browser_env, "true") == 0 ||
+                         strcmp(browser_env, "yes") == 0 ||
+                         strcmp(browser_env, "on") == 0));
 
     /* Determine transport mode */
     if (transport) {
@@ -1496,6 +1507,16 @@ static void cxl_memsim_init(void) {
             g_memsim.enabled = true;
             g_memsim.initialized = true;
             info_report("CXL Type3: CXLMemSim RDMA mode - %s:%d", g_memsim.host, g_memsim.port);
+        } else if (browser_requested) {
+            g_memsim.transport_mode = CXL_TRANSPORT_BROWSER;
+            g_strlcpy(g_memsim.host,
+                      browser_pool && browser_pool[0] ? browser_pool : host,
+                      sizeof(g_memsim.host));
+            g_memsim.port = port;
+            g_memsim.enabled = true;
+            g_memsim.initialized = true;
+            info_report("CXL Type3: CXLMemSim browser mode - pool %s:%d",
+                        g_memsim.host, g_memsim.port);
         } else if (strcmp(transport, "shm") == 0 || strcmp(transport, "pgas") == 0) {
             g_memsim.transport_mode = CXL_TRANSPORT_SHM;
             /* Get shared memory name from environment */
@@ -1629,6 +1650,30 @@ static int cxl_memsim_connect_locked(void) {
                    g_memsim.shm_slot_id,
                    (unsigned long)g_memsim.shm_header->num_cachelines,
                    g_memsim.shm_header->metadata_enabled ? "enabled" : "disabled");
+        return 0;
+    }
+
+    if (g_memsim.transport_mode == CXL_TRANSPORT_BROWSER) {
+        const char *size_env = getenv("CXL_MEMSIM_SIZE");
+        uint64_t pool_size = 256 * MiB;
+
+        if (size_env && size_env[0]) {
+            uint64_t parsed = g_ascii_strtoull(size_env, NULL, 10);
+            if (parsed > 0) {
+                pool_size = parsed;
+            }
+        }
+
+        if (cxl_memsim_browser_connect("type3", g_memsim.host,
+                                       g_memsim.port, pool_size) < 0) {
+            error_report("CXL Type3: Failed to connect browser CXLMemSim pool %s:%d",
+                         g_memsim.host, g_memsim.port);
+            return -1;
+        }
+
+        g_memsim.connected = true;
+        info_report("CXL Type3: Browser CXLMemSim pool connected to %s:%d",
+                    g_memsim.host, g_memsim.port);
         return 0;
     }
 
@@ -1788,7 +1833,8 @@ static int cxl_memsim_request_ext(uint8_t op, uint64_t addr, uint64_t size,
         info_report("CXL Type3: Request #%d (op=%s, connected=%d, transport=%s)",
                     request_count, op_name, g_memsim.connected,
                     g_memsim.transport_mode == CXL_TRANSPORT_SHM ? "PGAS" :
-                    g_memsim.transport_mode == CXL_TRANSPORT_RDMA ? "RDMA" : "TCP");
+                    g_memsim.transport_mode == CXL_TRANSPORT_RDMA ? "RDMA" :
+                    g_memsim.transport_mode == CXL_TRANSPORT_BROWSER ? "BROWSER" : "TCP");
     }
 
     /* Periodic latency injection stats (every 100k requests) */
@@ -1839,6 +1885,25 @@ static int cxl_memsim_request_ext(uint8_t op, uint64_t addr, uint64_t size,
             if (op == CXL_OP_READ) g_memsim.stats_reads++;
             else if (op == CXL_OP_WRITE) g_memsim.stats_writes++;
             else g_memsim.stats_atomics++;
+        }
+        pthread_mutex_unlock(&g_memsim.lock);
+        return ret;
+    }
+
+    /* Browser SharedWorker mode */
+    if (g_memsim.transport_mode == CXL_TRANSPORT_BROWSER) {
+        ret = cxl_memsim_browser_request(op, addr, size, data, value,
+                                         expected, resp, sizeof(*resp));
+        if (ret == 0) {
+            switch (op) {
+                case CXL_OP_READ:       g_memsim.stats_reads++; break;
+                case CXL_OP_WRITE:      g_memsim.stats_writes++; break;
+                case CXL_OP_ATOMIC_FAA:
+                case CXL_OP_ATOMIC_CAS: g_memsim.stats_atomics++; break;
+                case CXL_OP_FENCE:      g_memsim.stats_fences++; break;
+            }
+        } else {
+            g_memsim.connected = false;
         }
         pthread_mutex_unlock(&g_memsim.lock);
         return ret;
@@ -1976,9 +2041,12 @@ MemTxResult cxl_type3_read(PCIDevice *d, hwaddr host_addr, uint64_t *data,
 
             /* For TCP/RDMA mode, CXLMemSim is authoritative - skip local read */
             if (g_memsim.transport_mode == CXL_TRANSPORT_TCP ||
-                g_memsim.transport_mode == CXL_TRANSPORT_RDMA) {
+                g_memsim.transport_mode == CXL_TRANSPORT_RDMA ||
+                g_memsim.transport_mode == CXL_TRANSPORT_BROWSER) {
                 return MEMTX_OK;
             }
+        } else if (g_memsim.transport_mode == CXL_TRANSPORT_BROWSER) {
+            return MEMTX_ERROR;
         }
     }
 
@@ -2029,9 +2097,12 @@ MemTxResult cxl_type3_write(PCIDevice *d, hwaddr host_addr, uint64_t data,
 
             /* For TCP/RDMA mode, CXLMemSim is authoritative - skip local write */
             if (g_memsim.transport_mode == CXL_TRANSPORT_TCP ||
-                g_memsim.transport_mode == CXL_TRANSPORT_RDMA) {
+                g_memsim.transport_mode == CXL_TRANSPORT_RDMA ||
+                g_memsim.transport_mode == CXL_TRANSPORT_BROWSER) {
                 return MEMTX_OK;
             }
+        } else if (g_memsim.transport_mode == CXL_TRANSPORT_BROWSER) {
+            return MEMTX_ERROR;
         }
     }
 
@@ -2120,7 +2191,8 @@ static uint64_t get_lsa(CXLType3Dev *ct3d, void *buf, uint64_t size,
     /* Route LSA reads through CXLMemSim server in RPC transports. */
     if (g_memsim.enabled &&
         (g_memsim.transport_mode == CXL_TRANSPORT_TCP ||
-         g_memsim.transport_mode == CXL_TRANSPORT_RDMA)) {
+         g_memsim.transport_mode == CXL_TRANSPORT_RDMA ||
+         g_memsim.transport_mode == CXL_TRANSPORT_BROWSER)) {
         uint64_t remaining = size;
         uint64_t cur_offset = offset;
         uint8_t *dst = (uint8_t *)buf;
@@ -2169,7 +2241,8 @@ static void set_lsa(CXLType3Dev *ct3d, const void *buf, uint64_t size,
     /* Route LSA writes through CXLMemSim server in RPC transports. */
     if (g_memsim.enabled &&
         (g_memsim.transport_mode == CXL_TRANSPORT_TCP ||
-         g_memsim.transport_mode == CXL_TRANSPORT_RDMA)) {
+         g_memsim.transport_mode == CXL_TRANSPORT_RDMA ||
+         g_memsim.transport_mode == CXL_TRANSPORT_BROWSER)) {
         uint64_t remaining = size;
         uint64_t cur_offset = offset;
         const uint8_t *src = (const uint8_t *)buf;

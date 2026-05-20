@@ -12,6 +12,7 @@ system_ss.add(when: 'CONFIG_CXL',
                    'cxl_type2_coherency.c',
                    'cxl_p2p_dma.c',
                    'cxl_hetgpu.c',
+                   'cxl_memsim_browser.c',
                ),
                if_false: files(
                    'cxl-host-stubs.c',

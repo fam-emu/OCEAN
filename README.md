@@ -20,11 +20,28 @@ OCEAN – <ins>O</ins>pen-source <ins>C</ins>XL <ins>E</ins>mulation at Hypersca
 
 Compute Express Link (CXL) 3.0 introduces powerful memory pooling and promises to transform datacenter architectures. However, the lack of available CXL 3.0 hardware and the complexity of multi-host configurations pose significant challenges to the community. OCEAN is a comprehensive emulation framework that enables full CXL 3.0 functionality, including multi-host memory sharing and pooling support. OCEAN provides emulation of CXL 3.0 features—such as fabric management, dynamic memory allocation, and coherent memory sharing across multiple hosts—in advance of real hardware availability. An evaluation of OCEAN shows that it achieves performance within about 3x of projected native CXL 3.0 speeds having complete compatibility with existing CXL software stacks. We demonstrate the utility of OCEAN through a case study on Genomics Pipeline, distributed database, LLM workloads, observing up to a 15% improvement in application performance compared to traditional RDMA-based approaches.
 
+## How to Set up
+
+Particularly, to set up on a node in Blue Ocean, please run
+```bash
+bash script/setup_host_rocky_blue_ocean.sh
+```
+
+For other hosts that use Ubuntu, please run
+```bash
+bash script/setup_host_ubuntu.sh
+```
+
+This should build the server and qemu and download the VM images. 
+
+The remaining things are setup the network (`./script/setup_optional_cross_machine_network.sh`) and the VMs (`./qemu_integration/launch_qemu_cxl1.sh`), as shown below.
 
 ```bash
-git clone https://github.com/cxl-emu/OCEAN.git
-cd OCEAN
-bash ./script/setup_host.sh
+
+#----------------#
+# Set up network
+#----------------#
+
 # Assuming 2 hosts simulation. Change this based on the number of hosts you want to simulate. Skip this if you are using multiple physical machines:
 bash ./script/setup_network.sh 2
 
@@ -37,26 +54,37 @@ bash ./script/setup_optional_cross_machine_network.sh <num_vms> <br_ip_suffix>
 bash ./script/setup_optional_cross_machine_network.sh 1 1
 # create 1 VM on host 2
 bash ./script/setup_optional_cross_machine_network.sh 1 2
+```
 
-mkdir build
-cd build
-cmake .. -DSERVER_MODE=ON -DCMAKE_CXX_COMPILER=g++-13
-make -j$(nproc)
-wget https://asplos.dev/about/bzImage
-gdown 1ga5CN3_H1qfReer99w_QcVOYb6R21JHI
-cp qemu.img qemu1.img
+Before launching the VMs, please keep the server running on the host
+```bash
+cd submodules/CXLMemSim/build
 ./cxlmemsim_server --capacity=1024
+```
+
+After the server is running, please set up the second VM's network address and hostname by
+```bash
+#----------------#
+# Set up two VMs
+#----------------#
+cd build
 sudo ../qemu_integration/launch_qemu_cxl1.sh # login as root with password: victor129
 # in qemu
 vi /usr/local/bin/*.sh
 # change 192.168.100.10 to 11
+# change the bridge IP address to the host's bridge IP.
 vi /etc/hostname
 # change node0 to node1
 shutdown now
+```
+
+The VMs should be ready to launch
+```bash
 # out of qemu
-sudo ../qemu_integration/launch_qemu_cxl.sh 
+sudo ../qemu_integration/launch_qemu_cxl0.sh 
 sudo ../qemu_integration/launch_qemu_cxl1.sh 
 ```
+
 Make sure "/dev/dax0.0" exists inside both VM:
 ```bash
 ls /dev/dax0.0

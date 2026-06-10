@@ -53,7 +53,7 @@ source /opt/rh/gcc-toolset-13/enable 2>/dev/null
 # CMake
 mkdir temp || echo "It's okay."
 cd temp
-culr -OL https://github.com/Kitware/CMake/releases/download/v4.2.3/cmake-4.2.3.tar.gz
+curl -OL https://github.com/Kitware/CMake/releases/download/v4.2.3/cmake-4.2.3.tar.gz
 tar zxvf cmake-4.2.3.tar.gz 
 cd cmake-4.2.3/
 sudo ./bootstrap

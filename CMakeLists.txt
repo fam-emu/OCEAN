@@ -1,5 +1,9 @@
 cmake_minimum_required(VERSION 3.25.0)
-project(CXLMemSim VERSION 0.1.0)
+project(LegoMem VERSION 0.1.0)
+
+option(LEGOMEM_BUILD_QEMU_INTEGRATION "Build the QEMU LegoMem direct integration" ON)
+
+enable_testing()
 
 if ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU")
     add_compile_options (-fdiagnostics-color=always)
@@ -21,6 +25,9 @@ add_compile_definitions(SPDLOG_USE_STD_FORMAT)
 add_compile_definitions(SPDLOG_HEADER_ONLY)
 
 add_subdirectory(microbench)
+if (LEGOMEM_BUILD_QEMU_INTEGRATION)
+    add_subdirectory(qemu_integration)
+endif ()
 
 list(APPEND CMAKE_PREFIX_PATH ${CMAKE_BINARY_DIR})
 

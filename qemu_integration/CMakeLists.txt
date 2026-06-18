@@ -1,75 +1,54 @@
 cmake_minimum_required(VERSION 3.10)
-project(QEMUCXLMemSimIntegration)
+project(QEMULegoMemIntegration LANGUAGES C CXX)
 
 set(CMAKE_C_STANDARD 11)
 set(CMAKE_CXX_STANDARD 20)
 
-# Find parent CXLMemSim directory
-get_filename_component(CXLMEMSIM_ROOT ${CMAKE_CURRENT_SOURCE_DIR}/.. ABSOLUTE)
+include_directories(${CMAKE_CURRENT_SOURCE_DIR}/include)
 
-# Include directories
-include_directories(
+add_library(qemu_legomem STATIC
+    src/qemu_legomem.c
+)
+
+target_include_directories(qemu_legomem PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}/include
-    ${CXLMEMSIM_ROOT}/include
-    ${CXLMEMSIM_ROOT}/lib/Drywall/include
-    ${CXLMEMSIM_ROOT}/lib/Drywall/build
 )
 
-# QEMU interception library
-add_library(CXLMemSim SHARED
-    src/qemu_cxl_memsim.c
-    src/qemu_init_wrapper.c
-)
-
-target_link_libraries(CXLMemSim
+target_link_libraries(qemu_legomem
     pthread
 )
 
-set_target_properties(CXLMemSim PROPERTIES
-    POSITION_INDEPENDENT_CODE ON
+add_executable(legomem_server
+    src/legomem_server_simple.cpp
 )
 
-# CXLMemSim server (simple version without full CXLController dependency)
-add_executable(cxlmemsim_server
-    src/cxlmemsim_server_simple.cpp
-)
-
-target_link_libraries(cxlmemsim_server
+target_link_libraries(legomem_server
     pthread
 )
 
-# Test program
-add_executable(test_cxl_mem
-    test_cxl_mem.c
-    src/qemu_cxl_memsim.c
+add_executable(test_qemu_legomem_api
+    test_qemu_legomem_api.c
 )
 
-target_link_libraries(test_cxl_mem
-    pthread
+target_link_libraries(test_qemu_legomem_api
+    qemu_legomem
 )
 
-# Test kbd hook
-add_executable(test_kbd_hook
-    test_kbd_hook.c
+enable_testing()
+add_test(NAME qemu_legomem_api COMMAND test_qemu_legomem_api)
+
+install(TARGETS qemu_legomem legomem_server test_qemu_legomem_api
+    ARCHIVE DESTINATION lib
+    RUNTIME DESTINATION bin
 )
 
-target_link_libraries(test_kbd_hook
-    dl
+install(FILES include/qemu_legomem.h
+    DESTINATION include/legomem
 )
 
-# Install targets
-install(TARGETS CXLMemSim
-    LIBRARY DESTINATION /usr/local/lib
-)
-
-install(TARGETS cxlmemsim_server test_cxl_mem test_kbd_hook
-    RUNTIME DESTINATION ${CMAKE_CURRENT_BINARY_DIR}
-)
-
-# Copy scripts
-configure_file(${CMAKE_CURRENT_SOURCE_DIR}/launch_qemu_cxl.sh
-    ${CMAKE_CURRENT_BINARY_DIR}/launch_qemu_cxl.sh COPYONLY)
+configure_file(${CMAKE_CURRENT_SOURCE_DIR}/launch_qemu_legomem.sh
+    ${CMAKE_CURRENT_BINARY_DIR}/launch_qemu_legomem.sh COPYONLY)
 configure_file(${CMAKE_CURRENT_SOURCE_DIR}/start_server.sh
     ${CMAKE_CURRENT_BINARY_DIR}/start_server.sh COPYONLY)
-configure_file(${CMAKE_CURRENT_SOURCE_DIR}/topology_simple.txt
-    ${CMAKE_CURRENT_BINARY_DIR}/topology_simple.txt COPYONLY)
+configure_file(${CMAKE_CURRENT_SOURCE_DIR}/test_concurrent.sh
+    ${CMAKE_CURRENT_BINARY_DIR}/test_concurrent.sh COPYONLY)

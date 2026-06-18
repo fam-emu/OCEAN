@@ -9912,3 +9912,4 @@ workloads/gromacs/gromacs-2025.3/build/src/external/build-fftw/fftwBuild-prefix/
 workloads/gromacs/gromacs-2025.3/build/src/external/build-fftw/fftwBuild-prefix/src/fftwBuild-stamp/fftwBuild-urlinfo.txt
 workloads/gromacs/gromacs-2025.3/build/src/external/build-fftw/fftwBuild-prefix/src/fftwBuild-stamp/verify-fftwBuild.cmake
 build
+build-qemu-legomem

@@ -1,19 +1,13 @@
 #!/bin/bash
 
-NUM_CLIENTS=${1:-4}
+set -euo pipefail
 
-echo "Starting $NUM_CLIENTS concurrent clients..."
+CLIENTS=${1:-4}
+TEST_BIN=${TEST_BIN:-./build/test_qemu_legomem_api}
 
-for i in $(seq 1 $NUM_CLIENTS); do
-    ./test_cxl_mem > client_$i.log 2>&1 &
+for i in $(seq 1 "$CLIENTS"); do
+    "$TEST_BIN" > "legomem_client_${i}.log" 2>&1 &
 done
 
-echo "Waiting for all clients to complete..."
 wait
-
-echo "All clients completed. Checking results:"
-for i in $(seq 1 $NUM_CLIENTS); do
-    echo "Client $i:"
-    tail -n 5 client_$i.log
-    echo ""
-done
+echo "Completed $CLIENTS QEMU LegoMem API smoke clients"

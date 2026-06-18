@@ -1,0 +1,21 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  qemu-legomem:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configure QEMU LegoMem integration
+        run: cmake -S qemu_integration -B build/qemu-legomem -DCMAKE_BUILD_TYPE=Release
+
+      - name: Build QEMU LegoMem integration
+        run: cmake --build build/qemu-legomem -j2
+
+      - name: Test QEMU LegoMem integration
+        run: ctest --test-dir build/qemu-legomem --output-on-failure

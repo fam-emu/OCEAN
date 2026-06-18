@@ -1,0 +1,13 @@
+[Unit]
+Description=Verify LegoMem NUMA Node
+After=multi-user.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/setup_legomem_numa.sh
+RemainAfterExit=yes
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target

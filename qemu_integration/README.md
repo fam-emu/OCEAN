@@ -1,6 +1,6 @@
 # QEMU LegoMem Direct Integration
 
-This directory contains the QEMU-facing LegoMem integration. LegoMem is treated as a memory server. QEMU support is provided by a direct C library that QEMU code can link and call; there is no preload path and no device-model dependency.
+This directory contains the QEMU-facing LegoMem integration. LegoMem is treated as a memory server. QEMU support is provided by a direct C library that QEMU code can link and call, plus a vendored QEMU `memory-backend-legomem` object for NUMA placement. There is no preload path and no device-model dependency.
 
 ## Build
 
@@ -49,7 +49,7 @@ The address visible to the LegoMem server is:
 
 ## NUMA Launch Path
 
-`launch_qemu_legomem.sh` launches QEMU with a file-backed NUMA node for experiments:
+`launch_qemu_legomem.sh` launches patched QEMU with a LegoMem NUMA node:
 
 ```bash
 export LEGOMEM_SERVER_HOST=127.0.0.1
@@ -58,7 +58,14 @@ export LEGOMEM_REGION_ID=1
 ./launch_qemu_legomem.sh
 ```
 
-The launcher creates `/dev/shm/legomem_node0` by default and exposes it as NUMA node 1.
+The launcher uses:
+
+```text
+-object memory-backend-legomem,id=legomem-node1,size=...,server=...,port=...,region-id=...
+-numa node,nodeid=1,memdev=legomem-node1
+```
+
+The default QEMU binary is `../library/qemu/build/qemu-system-x86_64` when that patched build exists, otherwise `/usr/local/bin/qemu-system-x86_64`.
 
 ## Server
 

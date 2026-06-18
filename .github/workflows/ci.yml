@@ -19,3 +19,9 @@ jobs:
 
       - name: Test QEMU LegoMem integration
         run: ctest --test-dir build/qemu-legomem --output-on-failure
+
+      - name: Check vendored QEMU LegoMem backend wiring
+        run: |
+          test -f library/qemu/backends/hostmem-legomem.c
+          grep -q "hostmem-legomem.c" library/qemu/backends/meson.build
+          grep -q "TYPE_MEMORY_BACKEND_LEGOMEM" library/qemu/include/system/hostmem.h

@@ -41,6 +41,14 @@ OBJECT_DECLARE_TYPE(HostMemoryBackend, HostMemoryBackendClass,
 
 #define TYPE_MEMORY_BACKEND_MEMFD "memory-backend-memfd"
 
+/* hostmem-legomem.c */
+/**
+ * @TYPE_MEMORY_BACKEND_LEGOMEM:
+ * name of backend that exposes a NUMA-capable RAM region with LegoMem server
+ * metadata.
+ */
+#define TYPE_MEMORY_BACKEND_LEGOMEM "memory-backend-legomem"
+
 
 /**
  * HostMemoryBackendClass:

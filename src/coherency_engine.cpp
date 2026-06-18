@@ -1,5 +1,5 @@
 /*
- * CXLMemSim Unified MOESI Coherency Engine Implementation
+ * LegoMem Unified MOESI Coherency Engine Implementation
  *
  * SPDX-License-Identifier: (LGPL-2.1 OR BSD-2-Clause)
  * Copyright 2025 Regents of the University of California
@@ -7,8 +7,8 @@
  */
 
 #include "coherency_engine.h"
-#include "hdm_decoder.h"
-#include "cxlendpoint.h"
+#include "region_decoder.h"
+#include "legomemendpoint.h"
 #include <algorithm>
 #include <cmath>
 
@@ -17,9 +17,9 @@ DirectoryEntry::DirectoryEntry()
       owner_node(UINT32_MAX), owner_head(UINT32_MAX),
       version(0), last_access_time(0), has_dirty_data(false) {}
 
-CoherencyEngine::CoherencyEngine(uint32_t local_node, HDMDecoder* decoder, LogPModel* logp,
+CoherencyEngine::CoherencyEngine(uint32_t local_node, RegionDecoder* decoder, LogPModel* logp,
                                   uint32_t max_heads, double bandwidth_gbps)
-    : local_node_id_(local_node), hdm_decoder_(decoder), logp_model_(logp),
+    : local_node_id_(local_node), region_decoder_(decoder), logp_model_(logp),
       bandwidth_gbps_(bandwidth_gbps) {
     heads_.resize(max_heads);
     for (uint32_t i = 0; i < max_heads; i++) {

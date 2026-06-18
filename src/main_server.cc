@@ -1,6 +1,6 @@
 /*
- * CXLMemSim controller - Thread-per-Connection Server Mode
- * Multi-threaded server with one thread per client connection, shared CXLController,
+ * LegoMem controller - Thread-per-Connection Server Mode
+ * Multi-threaded server with one thread per client connection, shared LegoMemController,
  * coherency protocol, and congestion handling
  *
  *  SPDX-License-Identifier: (LGPL-2.1 OR BSD-2-Clause)
@@ -9,9 +9,9 @@
  */
 
 #include "../include/shared_memory_manager.h"
-#include "cxl_backend.h"
-#include "cxlcontroller.h"
-#include "cxlendpoint.h"
+#include "legomem_backend.h"
+#include "legomemcontroller.h"
+#include "legomemendpoint.h"
 #include "distributed_server.h"
 #include "helper.h"
 #include "monitor.h"
@@ -48,7 +48,7 @@
 
 // Global variables
 Helper helper{};
-CXLController* controller = nullptr;
+LegoMemController* controller = nullptr;
 Monitors* monitors = nullptr;  // Required by helper.cpp signal handlers
 
 // Operation type constants
@@ -104,7 +104,7 @@ struct BackInvalidationEntry {
 enum class CommMode {
     TCP,
     SHM,        // Shared Memory via /dev/shm (ring buffer based)
-    PGAS_SHM,   // PGAS Shared Memory (lock-free slots for cxl_backend.h clients)
+    PGAS_SHM,   // PGAS Shared Memory (lock-free slots for legomem_backend.h clients)
     DISTRIBUTED // Distributed multi-node memory server
 };
 
@@ -113,7 +113,7 @@ class ThreadPerConnectionServer {
 private:
     int server_fd;
     int port;
-    CXLController* controller;
+    LegoMemController* controller;
     std::atomic<bool> running;
     std::atomic<int> next_thread_id;
     
@@ -121,10 +121,10 @@ private:
     CommMode comm_mode;
     std::unique_ptr<ShmCommunicationManager> shm_comm_manager;
 
-    // PGAS SHMEM backend state (for cxl_backend.h protocol)
+    // PGAS SHMEM backend state (for legomem_backend.h protocol)
     std::string pgas_shm_name_;
     int pgas_shm_fd_;
-    cxl_shm_header_t* pgas_shm_header_;
+    legomem_shm_header_t* pgas_shm_header_;
     void* pgas_memory_;
     size_t pgas_memory_size_;
 
@@ -190,9 +190,9 @@ private:
     }
     
 public:
-    ThreadPerConnectionServer(int port, CXLController* ctrl, size_t capacity_mb,
+    ThreadPerConnectionServer(int port, LegoMemController* ctrl, size_t capacity_mb,
                             const std::string& backing_file = "", CommMode mode = CommMode::TCP,
-                            const std::string& pgas_shm_name = "/cxlmemsim_pgas")
+                            const std::string& pgas_shm_name = "/legomem_pgas")
         : port(port), controller(ctrl), running(true), next_thread_id(0),
           backing_file_(backing_file), comm_mode(mode),
           pgas_shm_name_(pgas_shm_name), pgas_shm_fd_(-1),
@@ -204,12 +204,12 @@ public:
         // Initialize shared memory manager
         if (!backing_file_.empty()) {
             SPDLOG_INFO("Using backing file for memory: {}", backing_file_);
-            shm_manager = std::make_unique<SharedMemoryManager>(capacity_mb, "/cxlmemsim_shared", true, backing_file_);
+            shm_manager = std::make_unique<SharedMemoryManager>(capacity_mb, "/legomem_shared", true, backing_file_);
         } else {
             shm_manager = std::make_unique<SharedMemoryManager>(capacity_mb);
         }
 
-        // Initialize LSA storage (256KB default per CXL spec)
+        // Initialize LSA storage (256KB default per LegoMem spec)
         lsa_size_ = 256 * 1024;
         lsa_data_.resize(lsa_size_, 0);
         SPDLOG_INFO("LSA initialized: {} bytes", lsa_size_);
@@ -224,7 +224,7 @@ public:
     void run_shm_mode();
     void handle_shm_requests();
 
-    // PGAS Shared memory mode methods (cxl_backend.h protocol)
+    // PGAS Shared memory mode methods (legomem_backend.h protocol)
     bool init_pgas_shm(const std::string& shm_name, size_t memory_size);
     void run_pgas_shm_mode();
     int poll_pgas_shm_requests();
@@ -267,21 +267,21 @@ void signal_handler(int sig) {
 
 int main(int argc, char *argv[]) {
     spdlog::cfg::load_env_levels();
-    cxxopts::Options options("CXLMemSim Server", "CXL.mem Type 3 Memory Controller Thread-per-Connection Server");
+    cxxopts::Options options("LegoMem Server", "LegoMem.mem Type 3 Memory Controller Thread-per-Connection Server");
     
     options.add_options()
-        ("h,help", "Help for CXLMemSim Server", cxxopts::value<bool>()->default_value("false"))
+        ("h,help", "Help for LegoMem Server", cxxopts::value<bool>()->default_value("false"))
         ("v,verbose", "Verbose level", cxxopts::value<int>()->default_value("2"))
         ("default_latency", "Default latency", cxxopts::value<size_t>()->default_value("100"))
         ("interleave_size", "Interleave size", cxxopts::value<size_t>()->default_value("256"))
-        ("capacity", "Capacity of CXL expander in MB", cxxopts::value<int>()->default_value("256"))
+        ("capacity", "Capacity of LegoMem expander in MB", cxxopts::value<int>()->default_value("256"))
         ("p,port", "Server port", cxxopts::value<int>()->default_value("9999"))
         ("t,topology", "Topology file", cxxopts::value<std::string>()->default_value("topology.txt"))
-        ("backing-file", "Back CXL memory with a regular file (shared across VMs)", cxxopts::value<std::string>()->default_value(""))
+        ("backing-file", "Back LegoMem memory with a regular file (shared across VMs)", cxxopts::value<std::string>()->default_value(""))
         ("comm-mode", "Communication mode: tcp, shm, pgas-shm, or distributed", cxxopts::value<std::string>()->default_value("tcp"))
-        ("pgas-shm-name", "PGAS shared memory name (for pgas-shm mode)", cxxopts::value<std::string>()->default_value("/cxlmemsim_pgas"))
+        ("pgas-shm-name", "PGAS shared memory name (for pgas-shm mode)", cxxopts::value<std::string>()->default_value("/legomem_pgas"))
         ("node-id", "Node ID for distributed mode (0 = coordinator)", cxxopts::value<uint32_t>()->default_value("0"))
-        ("dist-shm-name", "Shared memory name for distributed inter-node communication", cxxopts::value<std::string>()->default_value("/cxlmemsim_dist"))
+        ("dist-shm-name", "Shared memory name for distributed inter-node communication", cxxopts::value<std::string>()->default_value("/legomem_dist"))
         ("coordinator-shm", "Coordinator's shared memory name (for joining existing cluster)", cxxopts::value<std::string>()->default_value(""))
         ("transport-mode", "Transport mode for distributed: shm, tcp, or hybrid", cxxopts::value<std::string>()->default_value("shm"))
         ("tcp-addr", "TCP bind address for distributed TCP transport", cxxopts::value<std::string>()->default_value("0.0.0.0"))
@@ -380,12 +380,12 @@ int main(int argc, char *argv[]) {
     };
 
     // Create controller
-    controller = new CXLController(policies, capacity, PAGE, 10, default_latency);
+    controller = new LegoMemController(policies, capacity, PAGE, 10, default_latency);
 
-    // Create a CXL memory expander endpoint for the server's memory pool.
+    // Create a LegoMem memory expander endpoint for the server's memory pool.
     // This must happen BEFORE construct_topo() so the topology parser can
     // reference the expander by index.
-    auto *ep = new CXLMemExpander(
+    auto *ep = new LegoMemMemoryEndpoint(
         25, 25,                   // read/write bandwidth (GB/s)
         default_latency,          // read latency (ns)
         default_latency + 50,     // write latency (ns)
@@ -412,12 +412,12 @@ int main(int argc, char *argv[]) {
     }
     
     SPDLOG_INFO("========================================");
-    SPDLOG_INFO("CXLMemSim CXL Type3 Memory Server");
+    SPDLOG_INFO("LegoMem LegoMem Type3 Memory Server");
     SPDLOG_INFO("========================================");
     SPDLOG_INFO("Server Configuration:");
     const char* mode_str = (comm_mode == CommMode::TCP) ? "TCP" :
                            (comm_mode == CommMode::SHM) ? "Shared Memory (/dev/shm)" :
-                           (comm_mode == CommMode::PGAS_SHM) ? "PGAS Shared Memory (cxl_backend.h)" :
+                           (comm_mode == CommMode::PGAS_SHM) ? "PGAS Shared Memory (legomem_backend.h)" :
                            "Distributed Multi-Node";
     SPDLOG_INFO("  Communication Mode: {}", mode_str);
     if (comm_mode == CommMode::PGAS_SHM) {
@@ -449,9 +449,9 @@ int main(int argc, char *argv[]) {
     SPDLOG_INFO("  Capacity: {} MB", capacity);
     SPDLOG_INFO("  Default latency: {} ns", default_latency);
     SPDLOG_INFO("  Interleave size: {} bytes", interleave_size);
-    SPDLOG_INFO("CXL Type3 Operations Supported:");
-    SPDLOG_INFO("  - CXL_TYPE3_READ");
-    SPDLOG_INFO("  - CXL_TYPE3_WRITE");
+    SPDLOG_INFO("LegoMem Type3 Operations Supported:");
+    SPDLOG_INFO("  - LEGOMEM_READ");
+    SPDLOG_INFO("  - LEGOMEM_WRITE");
     if (comm_mode == CommMode::DISTRIBUTED) {
         SPDLOG_INFO("  - Distributed coherency protocol");
         SPDLOG_INFO("  - Inter-node message passing");
@@ -578,7 +578,7 @@ bool ThreadPerConnectionServer::start() {
     switch (comm_mode) {
         case CommMode::SHM:
             SPDLOG_INFO(">>> SHM mode: Skipping TCP socket initialization <<<");
-            shm_comm_manager = std::make_unique<ShmCommunicationManager>("/cxlmemsim_comm", true);
+            shm_comm_manager = std::make_unique<ShmCommunicationManager>("/legomem_comm", true);
             if (!shm_comm_manager->initialize()) {
                 SPDLOG_ERROR("Failed to initialize shared memory communication");
                 return false;
@@ -594,7 +594,7 @@ bool ThreadPerConnectionServer::start() {
                 SPDLOG_ERROR("Failed to initialize PGAS shared memory");
                 return false;
             }
-            SPDLOG_INFO("Server using PGAS shared memory mode (cxl_backend.h protocol)");
+            SPDLOG_INFO("Server using PGAS shared memory mode (legomem_backend.h protocol)");
             SPDLOG_INFO("No TCP port binding - communication via {} only", pgas_shm_name_);
             return true;
 
@@ -699,7 +699,7 @@ void ThreadPerConnectionServer::stop() {
     SPDLOG_INFO("  Coherency Downgrades: {}", coherency_downgrades.load());
     SPDLOG_INFO("  Back Invalidations: {}", back_invalidations.load());
 
-    // Print CXL controller topology statistics (switches/expanders/counters)
+    // Print LegoMem controller topology statistics (switches/expanders/counters)
     if (controller) {
         std::cout << std::format("{}", *controller) << std::endl;
     }
@@ -882,14 +882,14 @@ void ThreadPerConnectionServer::handle_request(int client_fd, int thread_id, Ser
     uint64_t cacheline_addr = req.addr & ~(63ULL);  // 64-byte aligned
     bool had_coherency_miss = false;
 
-    // Clamp size: some devices (e.g. cxl-type1 probes) may send size=0
+    // Clamp size: some devices (e.g. legomem-type1 probes) may send size=0
     if (req.size == 0 || req.size > SHM_CACHELINE_SIZE) {
         SPDLOG_DEBUG("Thread {}: clamping req.size from {} to {}", thread_id, req.size, SHM_CACHELINE_SIZE);
         req.size = SHM_CACHELINE_SIZE;
     }
 
-    // Log CXL Type3 operation with detailed information
-    const char* op_name = (req.op_type == OP_READ) ? "CXL_TYPE3_READ" : "CXL_TYPE3_WRITE";
+    // Log LegoMem Type3 operation with detailed information
+    const char* op_name = (req.op_type == OP_READ) ? "LEGOMEM_READ" : "LEGOMEM_WRITE";
 
     // Log incoming request details
     // SPDLOG_INFO("Thread {}: {} request - addr=0x{:x}, size={}, cacheline=0x{:x}",
@@ -908,7 +908,7 @@ void ThreadPerConnectionServer::handle_request(int client_fd, int thread_id, Ser
     
     // Check if address is valid in shared memory
     if (!shm_manager->is_valid_address(req.addr)) {
-        SPDLOG_ERROR("Thread {}: Invalid address 0x{:x} not in CXL memory range",
+        SPDLOG_ERROR("Thread {}: Invalid address 0x{:x} not in LegoMem memory range",
                     thread_id, (uint64_t)req.addr);
         resp.status = 1;
         return;
@@ -917,7 +917,7 @@ void ThreadPerConnectionServer::handle_request(int client_fd, int thread_id, Ser
     // Increment active requests
     congestion_info.active_requests++;
     
-    // Calculate base latency using CXL controller
+    // Calculate base latency using LegoMem controller
     std::vector<std::tuple<uint64_t, uint64_t>> access_elem;
     access_elem.push_back(std::make_tuple((uint64_t)req.addr, (uint64_t)req.size));
     double base_latency = controller->calculate_latency(access_elem, controller->dramlatency);
@@ -944,7 +944,7 @@ void ThreadPerConnectionServer::handle_request(int client_fd, int thread_id, Ser
         
         // Check if we need coherency actions
         if (req.op_type == OP_READ) {
-            // SPDLOG_DEBUG("Thread {}: CXL_TYPE3_READ processing - checking coherency for cacheline 0x{:x}", 
+            // SPDLOG_DEBUG("Thread {}: LEGOMEM_READ processing - checking coherency for cacheline 0x{:x}", 
             //             thread_id, cacheline_addr);
             
             // First check for back invalidations
@@ -953,7 +953,7 @@ void ThreadPerConnectionServer::handle_request(int client_fd, int thread_id, Ser
             if (info.state == EXCLUSIVE || info.state == MODIFIED) {
                 if (info.owner != -1 && info.owner != thread_id) {
                     had_coherency_miss = true;
-                    SPDLOG_DEBUG("Thread {}: CXL_TYPE3_READ coherency miss - cacheline owned by thread {}", 
+                    SPDLOG_DEBUG("Thread {}: LEGOMEM_READ coherency miss - cacheline owned by thread {}", 
                                 thread_id, info.owner);
                 }
             }
@@ -985,13 +985,13 @@ void ThreadPerConnectionServer::handle_request(int client_fd, int thread_id, Ser
             // Add back invalidation latency penalty if we had one
             if (had_back_invalidation) {
                 had_coherency_miss = true;  // Treat back invalidation as coherency miss
-                SPDLOG_DEBUG("Thread {}: CXL_TYPE3_READ had back invalidation for cacheline 0x{:x}", 
+                SPDLOG_DEBUG("Thread {}: LEGOMEM_READ had back invalidation for cacheline 0x{:x}", 
                             thread_id, cacheline_addr);
             }
             
             total_reads++;
 
-            // Propagate stats through CXL topology (switches/expanders)
+            // Propagate stats through LegoMem topology (switches/expanders)
             controller->counter.inc_local();
             for (auto &sw : controller->switches) {
                 sw->insert(req.timestamp, (uint64_t)thread_id, req.addr, req.addr, 0);
@@ -1002,17 +1002,17 @@ void ThreadPerConnectionServer::handle_request(int client_fd, int thread_id, Ser
 
             log_periodic_stats("READ", total_reads.load());
         } else {  // WRITE
-            // SPDLOG_DEBUG("Thread {}: CXL_TYPE3_WRITE processing - checking coherency for cacheline 0x{:x}", 
+            // SPDLOG_DEBUG("Thread {}: LEGOMEM_WRITE processing - checking coherency for cacheline 0x{:x}", 
             //             thread_id, cacheline_addr);
             
             if (info.state == SHARED && !info.sharers.empty()) {
                 had_coherency_miss = true;
-                SPDLOG_DEBUG("Thread {}: CXL_TYPE3_WRITE coherency miss - cacheline shared by {} threads", 
+                SPDLOG_DEBUG("Thread {}: LEGOMEM_WRITE coherency miss - cacheline shared by {} threads", 
                             thread_id, info.sharers.size());
             } else if ((info.state == EXCLUSIVE || info.state == MODIFIED) && 
                       info.owner != thread_id) {
                 had_coherency_miss = true;
-                SPDLOG_DEBUG("Thread {}: CXL_TYPE3_WRITE coherency miss - cacheline owned by thread {}", 
+                SPDLOG_DEBUG("Thread {}: LEGOMEM_WRITE coherency miss - cacheline owned by thread {}", 
                             thread_id, info.owner);
             }
             // Keep track of who needs invalidation before state change
@@ -1024,7 +1024,7 @@ void ThreadPerConnectionServer::handle_request(int client_fd, int thread_id, Ser
             }
             
             if (!threads_to_invalidate.empty()) {
-                // SPDLOG_INFO("Thread {}: CXL_TYPE3_WRITE invalidating {} threads for cacheline 0x{:x}", 
+                // SPDLOG_INFO("Thread {}: LEGOMEM_WRITE invalidating {} threads for cacheline 0x{:x}", 
                         //    thread_id, threads_to_invalidate.size(), cacheline_addr);
             }
             
@@ -1080,7 +1080,7 @@ void ThreadPerConnectionServer::handle_request(int client_fd, int thread_id, Ser
             
             total_writes++;
 
-            // Propagate stats through CXL topology (switches/expanders)
+            // Propagate stats through LegoMem topology (switches/expanders)
             controller->counter.inc_local();
             for (auto &sw : controller->switches) {
                 sw->insert(req.timestamp, (uint64_t)thread_id, req.addr, req.addr, 0);
@@ -1112,8 +1112,8 @@ void ThreadPerConnectionServer::handle_request(int client_fd, int thread_id, Ser
     resp.status = 0;
     resp.latency_ns = total_latency;
     
-    // Enhanced logging for CXL Type3 operations
-    const char* op_result = (req.op_type == OP_READ) ? "CXL_TYPE3_READ_COMPLETE" : "CXL_TYPE3_WRITE_COMPLETE";
+    // Enhanced logging for LegoMem Type3 operations
+    const char* op_result = (req.op_type == OP_READ) ? "LEGOMEM_READ_COMPLETE" : "LEGOMEM_WRITE_COMPLETE";
     // SPDLOG_INFO("Thread {}: {} addr=0x{:x} size={} latency={}ns (base={}ns congestion={:.2f}x coherency_miss={})",
     //             thread_id, op_result, req.addr, req.size, 
                 // total_latency, static_cast<uint64_t>(base_latency), congestion_factor, had_coherency_miss);
@@ -1135,7 +1135,7 @@ void ThreadPerConnectionServer::handle_atomic_request(int thread_id, ServerReque
     // Increment active requests for congestion tracking
     congestion_info.active_requests++;
 
-    // Calculate base latency using CXL controller
+    // Calculate base latency using LegoMem controller
     std::vector<std::tuple<uint64_t, uint64_t>> access_elem;
     access_elem.push_back(std::make_tuple((uint64_t)req.addr, (uint64_t)sizeof(uint64_t)));
     double base_latency = controller->calculate_latency(access_elem, controller->dramlatency);
@@ -1328,7 +1328,7 @@ void ThreadPerConnectionServer::handle_client(int client_fd, int thread_id) {
 
         // Validate op_type before processing
         if (req.op_type > OP_LSA_WRITE) {
-            SPDLOG_WARN("Thread {}: Invalid op_type {} (0x{:02x}) - possibly non-CXL client (HTTP scanner?), disconnecting",
+            SPDLOG_WARN("Thread {}: Invalid op_type {} (0x{:02x}) - possibly non-LegoMem client (HTTP scanner?), disconnecting",
                         thread_id, (int)req.op_type, (int)req.op_type);
             break;
         }
@@ -1517,7 +1517,7 @@ void ThreadPerConnectionServer::handle_shm_requests() {
 }
 
 // ============================================================================
-// PGAS Shared Memory Implementation (cxl_backend.h protocol)
+// PGAS Shared Memory Implementation (legomem_backend.h protocol)
 // Data and metadata stored together: 64-byte data + 64-byte metadata per cacheline
 // ============================================================================
 
@@ -1556,7 +1556,7 @@ bool ThreadPerConnectionServer::init_pgas_shm(const std::string& shm_name, size_
     // Each cacheline needs 128 bytes (64 data + 64 metadata)
     size_t num_cachelines = memory_size / 64;
     size_t entry_region_size = num_cachelines * sizeof(PGASMemoryEntry);
-    size_t header_size = CXL_SHM_HEADER_SIZE(CXL_SHM_MAX_SLOTS);
+    size_t header_size = LEGOMEM_SHM_HEADER_SIZE(LEGOMEM_SHM_MAX_SLOTS);
     size_t total_size = header_size + entry_region_size;
 
     if (ftruncate(pgas_shm_fd_, total_size) < 0) {
@@ -1576,27 +1576,27 @@ bool ThreadPerConnectionServer::init_pgas_shm(const std::string& shm_name, size_
         return false;
     }
 
-    pgas_shm_header_ = (cxl_shm_header_t*)mapped;
+    pgas_shm_header_ = (legomem_shm_header_t*)mapped;
     pgas_memory_ = (char*)mapped + header_size;
     pgas_memory_size_ = entry_region_size;
 
     // Initialize header
     memset(pgas_shm_header_, 0, header_size);
-    pgas_shm_header_->magic = CXL_SHM_MAGIC;
-    pgas_shm_header_->version = CXL_SHM_VERSION;
-    pgas_shm_header_->num_slots = CXL_SHM_MAX_SLOTS;
+    pgas_shm_header_->magic = LEGOMEM_SHM_MAGIC;
+    pgas_shm_header_->version = LEGOMEM_SHM_VERSION;
+    pgas_shm_header_->num_slots = LEGOMEM_SHM_MAX_SLOTS;
     pgas_shm_header_->memory_base = 0;
     pgas_shm_header_->memory_size = memory_size;  // Original memory size (data only)
     pgas_shm_header_->num_cachelines = num_cachelines;
     pgas_shm_header_->metadata_enabled = 1;  // Always enabled in PGAS mode
     pgas_shm_header_->entry_size = sizeof(PGASMemoryEntry);
-    pgas_shm_header_->flags = CXL_SHM_FLAG_METADATA_ENABLED;
+    pgas_shm_header_->flags = LEGOMEM_SHM_FLAG_METADATA_ENABLED;
 
     // Initialize memory entries (data + metadata)
     PGASMemoryEntry* entries = (PGASMemoryEntry*)pgas_memory_;
     for (size_t i = 0; i < num_cachelines; i++) {
         memset(&entries[i], 0, sizeof(PGASMemoryEntry));
-        entries[i].metadata.cache_state = CXL_CACHE_INVALID;
+        entries[i].metadata.cache_state = LegoMem_CACHE_INVALID;
         entries[i].metadata.owner_id = 0xFF;  // No owner
         entries[i].metadata.physical_addr = i * 64;  // Cacheline address
     }
@@ -1648,30 +1648,30 @@ int ThreadPerConnectionServer::poll_pgas_shm_requests() {
     size_t num_cachelines = pgas_shm_header_->memory_size / 64;
 
     for (uint32_t i = 0; i < pgas_shm_header_->num_slots; i++) {
-        cxl_shm_slot_t* slot = &pgas_shm_header_->slots[i];
+        legomem_shm_slot_t* slot = &pgas_shm_header_->slots[i];
 
         uint32_t req = __atomic_load_n(&slot->req_type, __ATOMIC_ACQUIRE);
-        if (req == CXL_SHM_REQ_NONE) continue;
+        if (req == LEGOMEM_SHM_REQ_NONE) continue;
 
         // Calculate cacheline index from address
         uint64_t addr = slot->addr;
         size_t cacheline_idx = addr / 64;
 
         if (cacheline_idx >= num_cachelines) {
-            slot->resp_status = CXL_SHM_RESP_ERROR;
-            __atomic_store_n(&slot->req_type, CXL_SHM_REQ_NONE, __ATOMIC_RELEASE);
+            slot->resp_status = LEGOMEM_SHM_RESP_ERROR;
+            __atomic_store_n(&slot->req_type, LEGOMEM_SHM_REQ_NONE, __ATOMIC_RELEASE);
             continue;
         }
 
         PGASMemoryEntry* entry = &entries[cacheline_idx];
 
-        // Calculate latency using CXL controller
+        // Calculate latency using LegoMem controller
         std::vector<std::tuple<uint64_t, uint64_t>> access_elem;
         access_elem.push_back(std::make_tuple(addr, slot->size));
         double base_latency = controller->calculate_latency(access_elem, controller->dramlatency);
 
         switch (req) {
-            case CXL_SHM_REQ_READ: {
+            case LEGOMEM_SHM_REQ_READ: {
                 // Update metadata
                 entry->metadata.access_count++;
                 entry->metadata.last_access_time = slot->timestamp;
@@ -1688,10 +1688,10 @@ int ThreadPerConnectionServer::poll_pgas_shm_requests() {
                 // Client can check this for coherency information
 
                 __atomic_thread_fence(__ATOMIC_RELEASE);
-                slot->resp_status = CXL_SHM_RESP_OK;
+                slot->resp_status = LEGOMEM_SHM_RESP_OK;
                 total_reads++;
 
-                // Propagate stats through CXL topology
+                // Propagate stats through LegoMem topology
                 controller->counter.inc_local();
                 for (auto &sw : controller->switches) {
                     sw->insert(slot->timestamp, 0, addr, addr, 0);
@@ -1705,7 +1705,7 @@ int ThreadPerConnectionServer::poll_pgas_shm_requests() {
                 break;
             }
 
-            case CXL_SHM_REQ_WRITE: {
+            case LEGOMEM_SHM_REQ_WRITE: {
                 // Copy data from slot to memory
                 size_t copy_size = std::min((size_t)slot->size, (size_t)64);
                 size_t offset = addr % 64;
@@ -1719,10 +1719,10 @@ int ThreadPerConnectionServer::poll_pgas_shm_requests() {
 
                 slot->latency_ns = (uint64_t)base_latency;
                 __atomic_thread_fence(__ATOMIC_RELEASE);
-                slot->resp_status = CXL_SHM_RESP_OK;
+                slot->resp_status = LEGOMEM_SHM_RESP_OK;
                 total_writes++;
 
-                // Propagate stats through CXL topology
+                // Propagate stats through LegoMem topology
                 controller->counter.inc_local();
                 for (auto &sw : controller->switches) {
                     sw->insert(slot->timestamp, 0, addr, addr, 0);
@@ -1736,7 +1736,7 @@ int ThreadPerConnectionServer::poll_pgas_shm_requests() {
                 break;
             }
 
-            case CXL_SHM_REQ_ATOMIC_FAA: {
+            case LEGOMEM_SHM_REQ_ATOMIC_FAA: {
                 if (slot->addr + sizeof(uint64_t) <= num_cachelines * 64) {
                     uint64_t* ptr = (uint64_t*)(entry->data + (addr % 64));
                     uint64_t old = __atomic_fetch_add(ptr, slot->value, __ATOMIC_SEQ_CST);
@@ -1748,17 +1748,17 @@ int ThreadPerConnectionServer::poll_pgas_shm_requests() {
 
                     slot->latency_ns = (uint64_t)base_latency;
                     __atomic_thread_fence(__ATOMIC_RELEASE);
-                    slot->resp_status = CXL_SHM_RESP_OK;
+                    slot->resp_status = LEGOMEM_SHM_RESP_OK;
                     total_atomic_faa++;
                     log_periodic_stats("PGAS_FAA", total_atomic_faa.load());
                 } else {
-                    slot->resp_status = CXL_SHM_RESP_ERROR;
+                    slot->resp_status = LEGOMEM_SHM_RESP_ERROR;
                 }
                 processed++;
                 break;
             }
 
-            case CXL_SHM_REQ_ATOMIC_CAS: {
+            case LEGOMEM_SHM_REQ_ATOMIC_CAS: {
                 if (slot->addr + sizeof(uint64_t) <= num_cachelines * 64) {
                     uint64_t* ptr = (uint64_t*)(entry->data + (addr % 64));
                     uint64_t expected = slot->expected;
@@ -1771,21 +1771,21 @@ int ThreadPerConnectionServer::poll_pgas_shm_requests() {
 
                     slot->latency_ns = (uint64_t)base_latency;
                     __atomic_thread_fence(__ATOMIC_RELEASE);
-                    slot->resp_status = CXL_SHM_RESP_OK;
+                    slot->resp_status = LEGOMEM_SHM_RESP_OK;
                     total_atomic_cas++;
                     log_periodic_stats("PGAS_CAS", total_atomic_cas.load());
                 } else {
-                    slot->resp_status = CXL_SHM_RESP_ERROR;
+                    slot->resp_status = LEGOMEM_SHM_RESP_ERROR;
                 }
                 processed++;
                 break;
             }
 
-            case CXL_SHM_REQ_FENCE: {
+            case LEGOMEM_SHM_REQ_FENCE: {
                 __atomic_thread_fence(__ATOMIC_SEQ_CST);
                 slot->latency_ns = 0;
                 __atomic_thread_fence(__ATOMIC_RELEASE);
-                slot->resp_status = CXL_SHM_RESP_OK;
+                slot->resp_status = LEGOMEM_SHM_RESP_OK;
                 total_fences++;
                 log_periodic_stats("PGAS_FENCE", total_fences.load());
                 processed++;
@@ -1797,7 +1797,7 @@ int ThreadPerConnectionServer::poll_pgas_shm_requests() {
         }
 
         // Clear request to mark slot as free
-        __atomic_store_n(&slot->req_type, CXL_SHM_REQ_NONE, __ATOMIC_RELEASE);
+        __atomic_store_n(&slot->req_type, LEGOMEM_SHM_REQ_NONE, __ATOMIC_RELEASE);
     }
 
     return processed;
@@ -1808,7 +1808,7 @@ void ThreadPerConnectionServer::cleanup_pgas_shm() {
         __atomic_store_n(&pgas_shm_header_->server_ready, 0, __ATOMIC_RELEASE);
 
         // Calculate total size for munmap
-        size_t header_size = CXL_SHM_HEADER_SIZE(pgas_shm_header_->num_slots);
+        size_t header_size = LEGOMEM_SHM_HEADER_SIZE(pgas_shm_header_->num_slots);
         size_t total_size = header_size + pgas_memory_size_;
 
         munmap(pgas_shm_header_, total_size);

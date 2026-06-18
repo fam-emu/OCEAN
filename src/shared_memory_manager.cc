@@ -1,5 +1,5 @@
 /*
- * Shared Memory Manager Implementation for CXLMemSim
+ * Shared Memory Manager Implementation for LegoMem
  * 
  * SPDX-License-Identifier: (LGPL-2.1 OR BSD-2-Clause)
  */
@@ -15,7 +15,7 @@
 #include <sys/types.h>
 #include <unistd.h>
 
-#define MAGIC_NUMBER 0x43584C4D454D5348ULL  // "CXLMEMSH"
+#define MAGIC_NUMBER 0x43584C4D454D5348ULL  // "LegoMemMEMSH"
 #define FORMAT_VERSION 1
 
 SharedMemoryManager::SharedMemoryManager(size_t capacity_mb, const std::string& shm_name)
@@ -186,9 +186,9 @@ void SharedMemoryManager::initialize_header() {
     header->data_offset = sizeof(SharedMemoryHeader);
     header->metadata_offset = 0;  // Metadata is kept locally, not in shared memory
     
-    // Support both low addresses (for testing) and high CXL addresses
+    // Support both low addresses (for testing) and high LegoMem addresses
     // Check environment variable for base address
-    const char* base_addr_env = getenv("CXL_BASE_ADDR");
+    const char* base_addr_env = getenv("LegoMem_BASE_ADDR");
     if (base_addr_env) {
         header->base_addr = strtoull(base_addr_env, NULL, 0);
     } else {
@@ -216,7 +216,7 @@ void SharedMemoryManager::initialize_data_area() {
     }
     
     // Initialize memory regions
-    // Start with one large region covering all CXL memory
+    // Start with one large region covering all LegoMem memory
     MemoryRegion region;
     region.base_addr = header->base_addr;
     region.size = header->num_cachelines * SHM_CACHELINE_SIZE;

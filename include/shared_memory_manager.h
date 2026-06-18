@@ -1,6 +1,6 @@
 /*
- * Shared Memory Manager for CXLMemSim
- * Provides real shared memory allocation for CXL memory simulation
+ * Shared Memory Manager for LegoMem
+ * Provides real shared memory allocation for LegoMem memory simulation
  * 
  * SPDX-License-Identifier: (LGPL-2.1 OR BSD-2-Clause)
  */
@@ -70,7 +70,7 @@ private:
         size_t data_offset;     // Offset to cacheline data area
         size_t metadata_offset; // Offset to metadata area
         uint64_t num_cachelines;// Number of cachelines
-        uint64_t base_addr;     // Base physical address for CXL memory
+        uint64_t base_addr;     // Base physical address for LegoMem memory
     };
     
     SharedMemoryHeader* header;
@@ -89,7 +89,7 @@ private:
     std::vector<MemoryRegion> regions;
     
 public:
-    explicit SharedMemoryManager(size_t capacity_mb, const std::string& shm_name = "/cxlmemsim_pgas");
+    explicit SharedMemoryManager(size_t capacity_mb, const std::string& shm_name = "/legomem_pgas");
     SharedMemoryManager(size_t capacity_mb, const std::string& shm_name, bool use_file, const std::string& file_path);
     ~SharedMemoryManager();
     

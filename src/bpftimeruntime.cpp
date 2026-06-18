@@ -1,5 +1,5 @@
 /*
- * CXLMemSim bpftime runtime
+ * LegoMem bpftime runtime
  *
  *  By: Andrew Quinn
  *      Yiwei Yang
@@ -36,7 +36,7 @@ BpfTimeRuntime::BpfTimeRuntime(pid_t tid, std::string program_location)
 }
 
 BpfTimeRuntime::~BpfTimeRuntime() {}
-int BpfTimeRuntime::read(CXLController *controller, BPFTimeRuntimeElem *elem) {
+int BpfTimeRuntime::read(LegoMemController *controller, BPFTimeRuntimeElem *elem) {
     mem_stats stats;
     proc_info proc_info1;
     proc_info thread_info1;

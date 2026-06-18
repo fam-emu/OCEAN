@@ -1,5 +1,5 @@
 /*
- * CXLMemSim helper
+ * LegoMem helper
  *
  *  By: Andrew Quinn
  *      Yiwei Yang

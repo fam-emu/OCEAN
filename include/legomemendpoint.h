@@ -1,5 +1,5 @@
 /*
- * CXLMemSim endpoint
+ * LegoMem endpoint
  *
  *  By: Andrew Quinn
  *      Yiwei Yang
@@ -9,10 +9,10 @@
  *  UC Santa Cruz Sluglab.
  */
 
-#ifndef CXLMEMSIM_CXLENDPOINT_H
-#define CXLMEMSIM_CXLENDPOINT_H
+#ifndef LEGOMEM_ENDPOINT_H
+#define LEGOMEM_ENDPOINT_H
 
-#include "cxlcounter.h"
+#include "legomemcounter.h"
 #include "helper.h"
 #include <list>
 #include <queue>
@@ -45,10 +45,10 @@ struct thread_info {
     std::queue<int> llcm_type_rob;
 };
 // Forward declarations
-class CXLController;
-class CXLEndPoint {
+class LegoMemController;
+class LegoMemEndpointBase {
 public:
-    virtual ~CXLEndPoint() = default;
+    virtual ~LegoMemEndpointBase() = default;
 
 private:
     virtual void set_epoch(int epoch) = 0;
@@ -62,14 +62,14 @@ private:
     virtual std::vector<std::tuple<uint64_t, uint64_t>> get_access(uint64_t timestamp) = 0;
 };
 
-// CXL Protocol constants
+// LegoMem Protocol constants
 constexpr size_t MAX_QUEUE_SIZE = 64;
 constexpr size_t FLIT_SIZE = 66;  // 528/8 = 66 bytes per flit
 constexpr size_t DATA_FLIT = 65;  // Data flit overhead in bytes
 constexpr size_t INITIAL_CREDITS = 2;  // ResCrd[2] for response credits
 
 // Request structure for queue management
-struct CXLRequest {
+struct LegoMemRequest {
     uint64_t timestamp;
     uint64_t address;
     uint64_t tid;
@@ -82,7 +82,7 @@ struct CXLRequest {
 /* ============================================================================
  * LogP Queuing Model
  *
- * Models point-to-point communication between CXL nodes:
+ * Models point-to-point communication between LegoMem nodes:
  *   L: Network latency (propagation delay, ns)
  *   o: Overhead (CPU processing time per message, ns)
  *   g: Gap (minimum inter-message time = 1/bandwidth, ns)
@@ -231,7 +231,7 @@ public:
 /* ============================================================================
  * MH-SLD: Multi-Headed Single Logical Device
  *
- * Models a CXL memory device shared by multiple hosts (heads).
+ * Models a LegoMem memory device shared by multiple hosts (heads).
  * Each host has its own port to the device, and cacheline states
  * track sharing/ownership across all heads.
  *
@@ -360,21 +360,21 @@ public:
     Stats get_stats() const;
 };
 
-class CXLMemExpander : public CXLEndPoint {
+class LegoMemMemoryEndpoint : public LegoMemEndpointBase {
 public:
-    EmuCXLBandwidth bandwidth{};
-    EmuCXLLatency latency{};
+    EmuLegoMemBandwidth bandwidth{};
+    EmuLegoMemLatency latency{};
     uint64_t capacity;
 
     std::vector<occupation_info> occupation; // timestamp, pa
     std::unordered_set<uint64_t> address_cache{};
     bool cache_valid = false;
-    CXLMemExpanderEvent counter{};
-    CXLMemExpanderEvent last_counter{};
+    LegoMemMemoryEndpointEvent counter{};
+    LegoMemMemoryEndpointEvent last_counter{};
     mutable std::shared_mutex occupationMutex_; // 使用共享互斥锁允许多个读取者
     
-    // Queue management for CXL requests
-    std::deque<CXLRequest> request_queue_;
+    // Queue management for LegoMem requests
+    std::deque<LegoMemRequest> request_queue_;
     mutable std::mutex queue_mutex_;
     
     // Credit-based flow control
@@ -382,7 +382,7 @@ public:
     std::atomic<size_t> write_credits_{INITIAL_CREDITS};
     
     // Pipeline state tracking
-    std::map<uint64_t, CXLRequest> in_flight_requests_;
+    std::map<uint64_t, LegoMemRequest> in_flight_requests_;
     
     // Latency components
     double frontend_latency_ = 10.0;  // Frontend processing latency
@@ -412,7 +412,7 @@ public:
     };
     std::vector<AddressRange> address_ranges;
 
-    CXLMemExpander(int read_bw, int write_bw, int read_lat, int write_lat, int id, int capacity);
+    LegoMemMemoryEndpoint(int read_bw, int write_bw, int read_lat, int write_lat, int id, int capacity);
     std::vector<std::tuple<uint64_t, uint64_t>> get_access(uint64_t timestamp) override;
     void set_epoch(int epoch) override;
     void free_stats(double size) override;
@@ -469,21 +469,21 @@ public:
         return false;
     }
     
-    // New methods for enhanced CXL simulation
+    // New methods for enhanced LegoMem simulation
     bool can_accept_request() const;
     bool has_credits(bool is_read) const;
     void consume_credit(bool is_read);
     void release_credit(bool is_read);
-    double calculate_pipeline_latency(const CXLRequest& req);
+    double calculate_pipeline_latency(const LegoMemRequest& req);
     void process_queued_requests(uint64_t current_time);
     double calculate_congestion_delay(uint64_t timestamp);
     double calculate_protocol_overhead(size_t data_size);
 };
-class CXLSwitch : public CXLEndPoint {
+class LegoMemSwitch : public LegoMemEndpointBase {
 public:
-    std::vector<CXLMemExpander *> expanders{};
-    std::vector<CXLSwitch *> switches{};
-    CXLSwitchEvent counter{};
+    std::vector<LegoMemMemoryEndpoint *> expanders{};
+    std::vector<LegoMemSwitch *> switches{};
+    LegoMemSwitchEvent counter{};
     int id = -1;
     int epoch = 0;
     uint64_t last_timestamp = 0;
@@ -491,12 +491,12 @@ public:
     std::unordered_map<uint64_t, uint64_t> timeseries_map;
 
     double congestion_latency = 0.02; // 200ns is the latency of the switch
-    explicit CXLSwitch(int id);
+    explicit LegoMemSwitch(int id);
     std::vector<std::tuple<uint64_t, uint64_t>> get_access(uint64_t timestamp) override;
     double calculate_latency(const std::vector<std::tuple<uint64_t, uint64_t>> &elem,
                              double dramlatency) override; // traverse the tree to calculate the latency
     double calculate_bandwidth(const std::vector<std::tuple<uint64_t, uint64_t>> &elem) override;
-    double get_endpoint_rob_latency(CXLMemExpander* endpoint,
+    double get_endpoint_rob_latency(LegoMemMemoryEndpoint* endpoint,
                                   const std::vector<std::tuple<uint64_t, uint64_t>>& accesses,
                                   const thread_info& t_info,
                                   double dramlatency);
@@ -508,7 +508,7 @@ public:
 };
 
 /* ============================================================================
- * FabricLink - Models inter-node CXL fabric link characteristics
+ * FabricLink - Models inter-node LegoMem fabric link characteristics
  *
  * Each link has latency, bandwidth, and credit-based flow control.
  * Congestion model: non-linear based on credit availability.
@@ -539,19 +539,19 @@ public:
 };
 
 /* ============================================================================
- * RemoteCXLExpander - Virtual endpoint for remote node memory
+ * RemoteLegoMemEndpoint - Virtual endpoint for remote node memory
  *
- * Wraps TCP transport to present remote memory as a local CXL endpoint
+ * Wraps TCP transport to present remote memory as a local LegoMem endpoint
  * in the topology tree. Includes shadow directory for cached coherency state.
  * ============================================================================ */
 
 // Forward declarations for distributed components
 class CoherencyEngine;
-class HDMDecoder;
+class RegionDecoder;
 class DistributedTCPTransport;
 class DistributedMessageManager;
 
-class RemoteCXLExpander : public CXLMemExpander {
+class RemoteLegoMemEndpoint : public LegoMemMemoryEndpoint {
 public:
     uint32_t remote_node_id_;
     uint32_t local_node_id_;
@@ -559,7 +559,7 @@ public:
     DistributedMessageManager* msg_manager_ = nullptr;
     std::unique_ptr<FabricLink> fabric_link_;
     CoherencyEngine* coherency_engine_ = nullptr;
-    HDMDecoder* hdm_decoder_ = nullptr;
+    RegionDecoder* region_decoder_ = nullptr;
     uint64_t remote_base_addr_;
     uint64_t remote_capacity_;
 
@@ -572,7 +572,7 @@ public:
     std::unordered_map<uint64_t, ShadowEntry> shadow_directory_;
     mutable std::shared_mutex shadow_mutex_;
 
-    RemoteCXLExpander(int id, uint32_t remote_node, uint32_t local_node,
+    RemoteLegoMemEndpoint(int id, uint32_t remote_node, uint32_t local_node,
                       uint64_t remote_base, uint64_t remote_capacity,
                       const FabricLinkConfig& link_cfg);
 
@@ -588,4 +588,4 @@ public:
     void update_shadow(uint64_t addr, MHSLDCacheState state, uint64_t ts);
 };
 
-#endif // CXLMEMSIM_CXLENDPOINT_H
+#endif // LEGOMEM_ENDPOINT_H

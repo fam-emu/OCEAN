@@ -1,5 +1,5 @@
 /*
- * CXLMemSim endpoint
+ * LegoMem endpoint
  *
  *  By: Andrew Quinn
  *      Yiwei Yang
@@ -9,20 +9,20 @@
  *  UC Santa Cruz Sluglab.
  */
 
-#include "cxlendpoint.h"
+#include "legomemendpoint.h"
 #include "coherency_engine.h"
 #include <random>
 #include <algorithm>
 
-CXLMemExpander::CXLMemExpander(int read_bw, int write_bw, int read_lat, int write_lat, int id, int capacity)
+LegoMemMemoryEndpoint::LegoMemMemoryEndpoint(int read_bw, int write_bw, int read_lat, int write_lat, int id, int capacity)
     : capacity(capacity), id(id), read_credits_(INITIAL_CREDITS), write_credits_(INITIAL_CREDITS) {
     this->bandwidth.read = read_bw;
     this->bandwidth.write = write_bw;
     this->latency.read = read_lat;
     this->latency.write = write_lat;
 }
-// 修改CXLMemExpander的calculate_latency函数
-double CXLMemExpander::calculate_latency(const std::vector<std::tuple<uint64_t, uint64_t>> &elem, double dramlatency) {
+// 修改LegoMemMemoryEndpoint的calculate_latency函数
+double LegoMemMemoryEndpoint::calculate_latency(const std::vector<std::tuple<uint64_t, uint64_t>> &elem, double dramlatency) {
     if (elem.empty()) {
         return 0.0;
     }
@@ -57,7 +57,7 @@ double CXLMemExpander::calculate_latency(const std::vector<std::tuple<uint64_t, 
         }
 
         // Create a temporary request for latency calculation
-        CXLRequest temp_req;
+        LegoMemRequest temp_req;
         temp_req.timestamp = timestamp;
         temp_req.address = addr;
         temp_req.is_read = true;  // Assume read for now
@@ -104,7 +104,7 @@ double CXLMemExpander::calculate_latency(const std::vector<std::tuple<uint64_t, 
     return access_count > 0 ? total_latency / access_count : 0.0;
 }
 
-double CXLMemExpander::calculate_bandwidth(const std::vector<std::tuple<uint64_t, uint64_t>> &elem) {
+double LegoMemMemoryEndpoint::calculate_bandwidth(const std::vector<std::tuple<uint64_t, uint64_t>> &elem) {
     if (elem.empty()) {
         return 0.0;
     }
@@ -134,7 +134,7 @@ double CXLMemExpander::calculate_bandwidth(const std::vector<std::tuple<uint64_t
     double max_bandwidth = this->bandwidth.read + this->bandwidth.write;
     return std::min(bandwidth_gbps- max_bandwidth, 0.0);
 }
-void CXLMemExpander::delete_entry(uint64_t addr, uint64_t length) {
+void LegoMemMemoryEndpoint::delete_entry(uint64_t addr, uint64_t length) {
     bool modified = false;
 
     // 使用引用来确保可以修改 occupation 中的元素
@@ -165,7 +165,7 @@ void CXLMemExpander::delete_entry(uint64_t addr, uint64_t length) {
     }
 }
 
-int CXLMemExpander::insert(uint64_t timestamp, uint64_t tid, uint64_t phys_addr, uint64_t virt_addr, int index) {
+int LegoMemMemoryEndpoint::insert(uint64_t timestamp, uint64_t tid, uint64_t phys_addr, uint64_t virt_addr, int index) {
     if (index == this->id) {
         last_timestamp = last_timestamp > timestamp ? last_timestamp : timestamp;
         
@@ -173,8 +173,8 @@ int CXLMemExpander::insert(uint64_t timestamp, uint64_t tid, uint64_t phys_addr,
         process_queued_requests(timestamp);
 
         if (phys_addr != 0) {
-            // Create a new CXL request
-            CXLRequest req;
+            // Create a new LegoMem request
+            LegoMemRequest req;
             req.timestamp = timestamp;
             req.address = phys_addr;
             req.tid = tid;
@@ -184,7 +184,7 @@ int CXLMemExpander::insert(uint64_t timestamp, uint64_t tid, uint64_t phys_addr,
             // Check if queue can accept the request
             if (!can_accept_request()) {
                 // Queue is full, reject the request
-                // Note: CXLMemExpanderEvent doesn't have inc_conflict, just count as hit_old
+                // Note: LegoMemMemoryEndpointEvent doesn't have inc_conflict, just count as hit_old
                 this->counter.inc_hit_old();
                 return 0;
             }
@@ -230,9 +230,9 @@ int CXLMemExpander::insert(uint64_t timestamp, uint64_t tid, uint64_t phys_addr,
     }
     return 0;
 }
-std::vector<std::tuple<uint64_t, uint64_t>> CXLMemExpander::get_access(uint64_t timestamp) {
+std::vector<std::tuple<uint64_t, uint64_t>> LegoMemMemoryEndpoint::get_access(uint64_t timestamp) {
     // 原子操作更新计数器
-    last_counter = CXLMemExpanderEvent(counter);
+    last_counter = LegoMemMemoryEndpointEvent(counter);
 
     // 使用互斥锁保护对共享资源的访问
 
@@ -246,8 +246,8 @@ std::vector<std::tuple<uint64_t, uint64_t>> CXLMemExpander::get_access(uint64_t 
     }
     return result;
 }
-void CXLMemExpander::set_epoch(int epoch) { this->epoch = epoch; }
-void CXLMemExpander::free_stats(double size) {
+void LegoMemMemoryEndpoint::set_epoch(int epoch) { this->epoch = epoch; }
+void LegoMemMemoryEndpoint::free_stats(double size) {
     bool modified = false;
 
     // 随机删除
@@ -269,7 +269,7 @@ void CXLMemExpander::free_stats(double size) {
     }
 }
 
-void CXLSwitch::delete_entry(uint64_t addr, uint64_t length) {
+void LegoMemSwitch::delete_entry(uint64_t addr, uint64_t length) {
     for (auto &expander : this->expanders) {
         expander->delete_entry(addr, length);
     }
@@ -277,8 +277,8 @@ void CXLSwitch::delete_entry(uint64_t addr, uint64_t length) {
         switch_->delete_entry(addr, length);
     }
 }
-CXLSwitch::CXLSwitch(int id) : id(id) {}
-double CXLSwitch::calculate_latency(const std::vector<std::tuple<uint64_t, uint64_t>> &elem, double dramlatency) {
+LegoMemSwitch::LegoMemSwitch(int id) : id(id) {}
+double LegoMemSwitch::calculate_latency(const std::vector<std::tuple<uint64_t, uint64_t>> &elem, double dramlatency) {
     double lat = 0.0;
     for (auto &expander : this->expanders) {
         lat += expander->calculate_latency(elem, dramlatency);
@@ -288,7 +288,7 @@ double CXLSwitch::calculate_latency(const std::vector<std::tuple<uint64_t, uint6
     }
     return lat;
 }
-double CXLSwitch::calculate_bandwidth(const std::vector<std::tuple<uint64_t, uint64_t>> &elem) {
+double LegoMemSwitch::calculate_bandwidth(const std::vector<std::tuple<uint64_t, uint64_t>> &elem) {
     double bw = 0.0;
     for (auto &expander : this->expanders) {
         bw += expander->calculate_bandwidth(elem);
@@ -299,7 +299,7 @@ double CXLSwitch::calculate_bandwidth(const std::vector<std::tuple<uint64_t, uin
     // time series
     return bw;
 }
-double CXLSwitch::get_endpoint_rob_latency(CXLMemExpander *endpoint,
+double LegoMemSwitch::get_endpoint_rob_latency(LegoMemMemoryEndpoint *endpoint,
                                          const std::vector<std::tuple<uint64_t, uint64_t>> &accesses,
                                          const thread_info &t_info, double dramlatency) {
     const auto &rob = t_info.rob;
@@ -360,7 +360,7 @@ double CXLSwitch::get_endpoint_rob_latency(CXLMemExpander *endpoint,
     return access_count > 0 ? total_latency / access_count : 0.0;
 }
 
-std::tuple<double, std::vector<uint64_t>> CXLSwitch::calculate_congestion() {
+std::tuple<double, std::vector<uint64_t>> LegoMemSwitch::calculate_congestion() {
     double latency = 0.0;
     std::vector<uint64_t> congestion;
 
@@ -459,7 +459,7 @@ std::tuple<double, std::vector<uint64_t>> CXLSwitch::calculate_congestion() {
     return std::make_tuple(latency, congestion);
 }
 
-std::vector<std::tuple<uint64_t, uint64_t>> CXLSwitch::get_access(uint64_t timestamp) {
+std::vector<std::tuple<uint64_t, uint64_t>> LegoMemSwitch::get_access(uint64_t timestamp) {
     std::vector<std::tuple<uint64_t, uint64_t>> res;
     size_t total_size = 0;
     for (const auto &expander : expanders) {
@@ -482,17 +482,17 @@ std::vector<std::tuple<uint64_t, uint64_t>> CXLSwitch::get_access(uint64_t times
 
     return res;
 }
-void CXLSwitch::set_epoch(int epoch) { this->epoch = epoch; }
-void CXLSwitch::free_stats(double size) {
+void LegoMemSwitch::set_epoch(int epoch) { this->epoch = epoch; }
+void LegoMemSwitch::free_stats(double size) {
     // 随机删除
     for (auto &expander : this->expanders) {
         expander->free_stats(size);
     }
 }
 
-int CXLSwitch::insert(uint64_t timestamp, uint64_t tid, uint64_t phys_addr, uint64_t virt_addr, int index) {
+int LegoMemSwitch::insert(uint64_t timestamp, uint64_t tid, uint64_t phys_addr, uint64_t virt_addr, int index) {
     // 简单示例：依次调用下属的 expander 和 switch
-    SPDLOG_DEBUG("CXLSwitch insert phys_addr={}, virt_addr={}, index={} for switch id:{}", phys_addr, virt_addr, index,
+    SPDLOG_DEBUG("LegoMemSwitch insert phys_addr={}, virt_addr={}, index={} for switch id:{}", phys_addr, virt_addr, index,
                  this->id);
 
     for (auto &expander : this->expanders) {
@@ -523,13 +523,13 @@ int CXLSwitch::insert(uint64_t timestamp, uint64_t tid, uint64_t phys_addr, uint
     return 0;
 }
 
-// Implementation of new CXL queue management and pipeline methods
-bool CXLMemExpander::can_accept_request() const {
+// Implementation of new LegoMem queue management and pipeline methods
+bool LegoMemMemoryEndpoint::can_accept_request() const {
     std::lock_guard<std::mutex> lock(queue_mutex_);
     return request_queue_.size() < MAX_QUEUE_SIZE;
 }
 
-bool CXLMemExpander::has_credits(bool is_read) const {
+bool LegoMemMemoryEndpoint::has_credits(bool is_read) const {
     if (is_read) {
         return read_credits_.load() > 0;
     } else {
@@ -537,7 +537,7 @@ bool CXLMemExpander::has_credits(bool is_read) const {
     }
 }
 
-void CXLMemExpander::consume_credit(bool is_read) {
+void LegoMemMemoryEndpoint::consume_credit(bool is_read) {
     if (is_read) {
         read_credits_.fetch_sub(1);
     } else {
@@ -545,7 +545,7 @@ void CXLMemExpander::consume_credit(bool is_read) {
     }
 }
 
-void CXLMemExpander::release_credit(bool is_read) {
+void LegoMemMemoryEndpoint::release_credit(bool is_read) {
     if (is_read) {
         size_t current = read_credits_.load();
         if (current < INITIAL_CREDITS) {
@@ -559,7 +559,7 @@ void CXLMemExpander::release_credit(bool is_read) {
     }
 }
 
-double CXLMemExpander::calculate_pipeline_latency(const CXLRequest& req) {
+double LegoMemMemoryEndpoint::calculate_pipeline_latency(const LegoMemRequest& req) {
     double total_latency = 0.0;
     
     // Frontend processing latency
@@ -587,7 +587,7 @@ double CXLMemExpander::calculate_pipeline_latency(const CXLRequest& req) {
     return total_latency;
 }
 
-void CXLMemExpander::process_queued_requests(uint64_t current_time) {
+void LegoMemMemoryEndpoint::process_queued_requests(uint64_t current_time) {
     std::lock_guard<std::mutex> lock(queue_mutex_);
     
     // Process requests that have completed their pipeline stages
@@ -604,7 +604,7 @@ void CXLMemExpander::process_queued_requests(uint64_t current_time) {
     
     // Try to issue new requests from queue
     while (!request_queue_.empty() && in_flight_requests_.size() < MAX_QUEUE_SIZE / 2) {
-        CXLRequest& req = request_queue_.front();
+        LegoMemRequest& req = request_queue_.front();
         
         // Check if we have credits available
         if (!has_credits(req.is_read)) {
@@ -621,7 +621,7 @@ void CXLMemExpander::process_queued_requests(uint64_t current_time) {
     }
 }
 
-double CXLMemExpander::calculate_congestion_delay(uint64_t timestamp) {
+double LegoMemMemoryEndpoint::calculate_congestion_delay(uint64_t timestamp) {
     // Calculate congestion based on queue occupancy
     double queue_utilization = static_cast<double>(request_queue_.size()) / MAX_QUEUE_SIZE;
 
@@ -635,7 +635,7 @@ double CXLMemExpander::calculate_congestion_delay(uint64_t timestamp) {
     }
 }
 
-double CXLMemExpander::calculate_protocol_overhead(size_t data_size) {
+double LegoMemMemoryEndpoint::calculate_protocol_overhead(size_t data_size) {
     // Calculate number of flits needed
     size_t num_flits = (data_size + FLIT_SIZE - 1) / FLIT_SIZE;
 
@@ -648,7 +648,7 @@ double CXLMemExpander::calculate_protocol_overhead(size_t data_size) {
 /* ============================================================================
  * MH-SLD (Multi-Headed Single Logical Device) Implementation
  *
- * Provides pooling and sharing of CXL memory across multiple hosts,
+ * Provides pooling and sharing of LegoMem memory across multiple hosts,
  * with cacheline-state-aware coherency protocol and LogP-based latency.
  * ============================================================================ */
 
@@ -1159,7 +1159,7 @@ MHSLDDevice::Stats MHSLDDevice::get_stats() const {
 /* ============================================================================
  * FabricLink Implementation
  *
- * Models CXL fabric link with latency, bandwidth, and congestion.
+ * Models LegoMem fabric link with latency, bandwidth, and congestion.
  * ============================================================================ */
 
 FabricLink::FabricLink(uint32_t src, uint32_t dst, const FabricLinkConfig& cfg)
@@ -1229,21 +1229,21 @@ double FabricLink::get_utilization(uint64_t window_ns) const {
 }
 
 /* ============================================================================
- * RemoteCXLExpander Implementation
+ * RemoteLegoMemEndpoint Implementation
  *
  * Virtual endpoint that represents remote node memory in the topology tree.
  * ============================================================================ */
 
-RemoteCXLExpander::RemoteCXLExpander(int id, uint32_t remote_node, uint32_t local_node,
+RemoteLegoMemEndpoint::RemoteLegoMemEndpoint(int id, uint32_t remote_node, uint32_t local_node,
                                      uint64_t remote_base, uint64_t remote_capacity,
                                      const FabricLinkConfig& link_cfg)
-    : CXLMemExpander(25, 25, 100, 150, id, static_cast<int>(remote_capacity / (1024*1024))),
+    : LegoMemMemoryEndpoint(25, 25, 100, 150, id, static_cast<int>(remote_capacity / (1024*1024))),
       remote_node_id_(remote_node), local_node_id_(local_node),
       remote_base_addr_(remote_base), remote_capacity_(remote_capacity) {
     fabric_link_ = std::make_unique<FabricLink>(local_node, remote_node, link_cfg);
 }
 
-double RemoteCXLExpander::calculate_latency(const std::vector<std::tuple<uint64_t, uint64_t>>& elem,
+double RemoteLegoMemEndpoint::calculate_latency(const std::vector<std::tuple<uint64_t, uint64_t>>& elem,
                                              double dramlatency) {
     if (elem.empty()) return 0.0;
 
@@ -1290,7 +1290,7 @@ double RemoteCXLExpander::calculate_latency(const std::vector<std::tuple<uint64_
     return access_count > 0 ? total_latency / access_count : 0.0;
 }
 
-double RemoteCXLExpander::calculate_bandwidth(const std::vector<std::tuple<uint64_t, uint64_t>>& elem) {
+double RemoteLegoMemEndpoint::calculate_bandwidth(const std::vector<std::tuple<uint64_t, uint64_t>>& elem) {
     if (elem.empty()) return 0.0;
 
     // Remote bandwidth is limited by fabric link bandwidth
@@ -1313,7 +1313,7 @@ double RemoteCXLExpander::calculate_bandwidth(const std::vector<std::tuple<uint6
     return std::min(bw_gbps - fabric_link_->config_.bandwidth_gbps, 0.0);
 }
 
-int RemoteCXLExpander::insert(uint64_t timestamp, uint64_t tid, uint64_t phys_addr,
+int RemoteLegoMemEndpoint::insert(uint64_t timestamp, uint64_t tid, uint64_t phys_addr,
                               uint64_t virt_addr, int index) {
     if (index != this->id) return 0;
 
@@ -1350,7 +1350,7 @@ int RemoteCXLExpander::insert(uint64_t timestamp, uint64_t tid, uint64_t phys_ad
     return 1;
 }
 
-void RemoteCXLExpander::invalidate_shadow(uint64_t addr) {
+void RemoteLegoMemEndpoint::invalidate_shadow(uint64_t addr) {
     uint64_t cl_addr = addr & ~63ULL;
     std::unique_lock<std::shared_mutex> lock(shadow_mutex_);
     auto it = shadow_directory_.find(cl_addr);
@@ -1360,7 +1360,7 @@ void RemoteCXLExpander::invalidate_shadow(uint64_t addr) {
     }
 }
 
-void RemoteCXLExpander::update_shadow(uint64_t addr, MHSLDCacheState state, uint64_t ts) {
+void RemoteLegoMemEndpoint::update_shadow(uint64_t addr, MHSLDCacheState state, uint64_t ts) {
     uint64_t cl_addr = addr & ~63ULL;
     std::unique_lock<std::shared_mutex> lock(shadow_mutex_);
     shadow_directory_[cl_addr] = {state, ts, true};

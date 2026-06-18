@@ -1,5 +1,5 @@
 /*
- * CXLMemSim uncore
+ * LegoMem uncore
  *
  *  By: Andrew Quinn
  *      Yiwei Yang
@@ -9,8 +9,8 @@
  *  UC Santa Cruz Sluglab.
  */
 
-#ifndef CXLMEMSIM_UNCORE_H
-#define CXLMEMSIM_UNCORE_H
+#ifndef LEGOMEM_UNCORE_H
+#define LEGOMEM_UNCORE_H
 #include "helper.h"
 #include "perf.h"
 #include <array>
@@ -29,4 +29,4 @@ public:
     int read_cha_elems(struct CHAElem *elem);
 };
 
-#endif // CXLMEMSIM_UNCORE_H
+#endif // LEGOMEM_UNCORE_H

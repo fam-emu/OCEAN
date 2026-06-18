@@ -1,5 +1,5 @@
 /*
- * CXLMemSim monitor
+ * LegoMem monitor
  *
  *  By: Andrew Quinn
  *      Yiwei Yang

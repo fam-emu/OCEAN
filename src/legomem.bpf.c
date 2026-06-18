@@ -1,6 +1,6 @@
 #define BPF_NO_GLOBAL_DATA
 /*
- * CXLMemSim bpfhook
+ * LegoMem bpfhook
  *
  *  By: Andrew Quinn
  *      Yiwei Yang

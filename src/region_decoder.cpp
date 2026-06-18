@@ -1,21 +1,21 @@
 /*
- * CXLMemSim HDM Decoder Implementation
+ * LegoMem Region Decoder Implementation
  *
  * SPDX-License-Identifier: (LGPL-2.1 OR BSD-2-Clause)
  * Copyright 2025 Regents of the University of California
  * UC Santa Cruz Sluglab.
  */
 
-#include "hdm_decoder.h"
+#include "region_decoder.h"
 
-HDMDecoder::HDMDecoder(HDMDecoderMode mode) : mode_(mode) {}
+RegionDecoder::RegionDecoder(RegionDecoderMode mode) : mode_(mode) {}
 
-void HDMDecoder::add_range(uint64_t base, uint64_t size, uint32_t target_id, bool is_remote) {
+void RegionDecoder::add_range(uint64_t base, uint64_t size, uint32_t target_id, bool is_remote) {
     ranges_.push_back({base, size, target_id, is_remote});
     ranges_sorted_ = false;
 }
 
-void HDMDecoder::configure_interleave(InterleaveGranularity gran,
+void RegionDecoder::configure_interleave(InterleaveGranularity gran,
                                        const std::vector<uint32_t>& targets,
                                        uint64_t base, uint64_t total_size) {
     interleave_config_.granularity = gran;
@@ -24,21 +24,21 @@ void HDMDecoder::configure_interleave(InterleaveGranularity gran,
     interleave_config_.total_size = total_size;
 }
 
-void HDMDecoder::sort_ranges() {
+void RegionDecoder::sort_ranges() {
     std::sort(ranges_.begin(), ranges_.end(),
-              [](const HDMRange& a, const HDMRange& b) {
+              [](const RegionRange& a, const RegionRange& b) {
                   return a.base_addr < b.base_addr;
               });
     ranges_sorted_ = true;
 }
 
-HDMDecoder::DecodeResult HDMDecoder::decode(uint64_t addr) const {
+RegionDecoder::DecodeResult RegionDecoder::decode(uint64_t addr) const {
     switch (mode_) {
-        case HDMDecoderMode::RANGE_BASED:
+        case RegionDecoderMode::RANGE_BASED:
             return decode_range(addr);
-        case HDMDecoderMode::INTERLEAVED:
+        case RegionDecoderMode::INTERLEAVED:
             return decode_interleaved(addr);
-        case HDMDecoderMode::HYBRID: {
+        case RegionDecoderMode::HYBRID: {
             // Try range-based first, fall back to interleaved
             auto result = decode_range(addr);
             if (result.target_id != UINT32_MAX) {
@@ -50,7 +50,7 @@ HDMDecoder::DecodeResult HDMDecoder::decode(uint64_t addr) const {
     return {UINT32_MAX, 0, false, 0};
 }
 
-HDMDecoder::DecodeResult HDMDecoder::decode_range(uint64_t addr) const {
+RegionDecoder::DecodeResult RegionDecoder::decode_range(uint64_t addr) const {
     // Binary search through sorted ranges
     if (ranges_.empty()) {
         return {UINT32_MAX, 0, false, 0};
@@ -87,7 +87,7 @@ HDMDecoder::DecodeResult HDMDecoder::decode_range(uint64_t addr) const {
     return {UINT32_MAX, 0, false, 0};
 }
 
-HDMDecoder::DecodeResult HDMDecoder::decode_interleaved(uint64_t addr) const {
+RegionDecoder::DecodeResult RegionDecoder::decode_interleaved(uint64_t addr) const {
     if (interleave_config_.target_ids.empty()) {
         return {UINT32_MAX, 0, false, 0};
     }
@@ -123,12 +123,12 @@ HDMDecoder::DecodeResult HDMDecoder::decode_interleaved(uint64_t addr) const {
     return {target_id, local_offset, is_remote, hops};
 }
 
-uint32_t HDMDecoder::get_home_node(uint64_t addr) const {
+uint32_t RegionDecoder::get_home_node(uint64_t addr) const {
     auto result = decode(addr);
     return result.target_id;
 }
 
-bool HDMDecoder::is_local(uint64_t addr, uint32_t local_node_id) const {
+bool RegionDecoder::is_local(uint64_t addr, uint32_t local_node_id) const {
     auto result = decode(addr);
     return result.target_id == local_node_id && !result.is_remote;
 }

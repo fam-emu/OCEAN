@@ -33,38 +33,45 @@ list(APPEND CMAKE_PREFIX_PATH ${CMAKE_BINARY_DIR})
 
 find_package(cxxopts REQUIRED)
 find_package(spdlog REQUIRED)
-file(GLOB_RECURSE SOURCE_FILES src/cxl*.cpp src/policy.cpp src/helper.cpp src/incore.cpp src/uncore.cpp src/perf.cpp src/monitor.cpp)
+file(GLOB_RECURSE SOURCE_FILES src/legomem*.cpp src/slugarch_model.cpp src/policy.cpp src/helper.cpp src/incore.cpp src/uncore.cpp src/perf.cpp src/monitor.cpp)
 
 execute_process(COMMAND uname -r OUTPUT_VARIABLE arch OUTPUT_STRIP_TRAILING_WHITESPACE)
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -fPIC -pthread")
 set(CMAKE_EXE_LINKER_FLAGS  "${CMAKE_EXE_LINKER_FLAGS} -latomic")
 
 
-# Create a static library of CXL core functionality
-add_library(cxlmemsim STATIC ${SOURCE_FILES})
-target_include_directories(cxlmemsim PUBLIC include ${cxxopts_INCLUDE_DIR} ${spdlog_INCLUDE_DIR})
-target_link_libraries(cxlmemsim cxxopts::cxxopts spdlog::spdlog_header_only)
+# Create a static library of LegoMem core functionality
+add_library(legomem STATIC ${SOURCE_FILES})
+target_include_directories(legomem PUBLIC include ${cxxopts_INCLUDE_DIR} ${spdlog_INCLUDE_DIR})
+target_link_libraries(legomem cxxopts::cxxopts spdlog::spdlog_header_only)
 
 # Build latency calculator
-add_executable(cxlmemsim_latency src/calculateLatency.cc)
-set_target_properties(cxlmemsim_latency PROPERTIES
+add_executable(legomem_latency src/calculateLatency.cc)
+set_target_properties(legomem_latency PROPERTIES
     RUNTIME_OUTPUT_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
 )
 
 # Server library (shared between server executable and tests)
-set(SERVER_LIB_SOURCES src/shared_memory_manager.cc src/shm_communication.cpp src/distributed_server.cpp src/tcp_communication.cpp src/hdm_decoder.cpp src/coherency_engine.cpp)
-add_library(cxlmemsim_server_lib STATIC ${SERVER_LIB_SOURCES})
-target_include_directories(cxlmemsim_server_lib PUBLIC include src ${cxxopts_INCLUDE_DIR} ${spdlog_INCLUDE_DIR})
-target_link_libraries(cxlmemsim_server_lib cxlmemsim cxxopts::cxxopts spdlog::spdlog_header_only rt)
+set(SERVER_LIB_SOURCES src/shared_memory_manager.cc src/shm_communication.cpp src/distributed_server.cpp src/tcp_communication.cpp src/region_decoder.cpp src/coherency_engine.cpp)
+add_library(legomem_server_lib STATIC ${SERVER_LIB_SOURCES})
+target_include_directories(legomem_server_lib PUBLIC include src ${cxxopts_INCLUDE_DIR} ${spdlog_INCLUDE_DIR})
+target_link_libraries(legomem_server_lib legomem cxxopts::cxxopts spdlog::spdlog_header_only rt)
 
 # Build server (uses server library + main)
-add_executable(cxlmemsim_server src/main_server.cc)
-target_include_directories(cxlmemsim_server PRIVATE include src ${cxxopts_INCLUDE_DIR} ${spdlog_INCLUDE_DIR})
-target_link_libraries(cxlmemsim_server cxlmemsim_server_lib cxlmemsim cxxopts::cxxopts spdlog::spdlog_header_only rt)
+add_executable(legomem_memory_server src/main_server.cc)
+target_include_directories(legomem_memory_server PRIVATE include src ${cxxopts_INCLUDE_DIR} ${spdlog_INCLUDE_DIR})
+target_link_libraries(legomem_memory_server legomem_server_lib legomem cxxopts::cxxopts spdlog::spdlog_header_only rt)
 
 # Installation targets
-install(TARGETS cxlmemsim_server
+install(TARGETS legomem_memory_server
         RUNTIME DESTINATION bin)
 
 install(FILES include/tcp_communication.h
-        DESTINATION include/cxlmemsim)
+        DESTINATION include/legomem)
+
+add_executable(test_slugarch_model tests/test_slugarch_model.cpp src/slugarch_model.cpp)
+target_include_directories(test_slugarch_model PRIVATE include)
+add_test(NAME slugarch_model COMMAND test_slugarch_model)
+
+add_test(NAME no_legacy_memory_names
+         COMMAND bash ${CMAKE_CURRENT_SOURCE_DIR}/tests/check_no_legacy_memory_names.sh)

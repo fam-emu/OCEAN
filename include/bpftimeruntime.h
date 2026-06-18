@@ -1,5 +1,5 @@
 /*
- * CXLMemSim controller
+ * LegoMem controller
  *
  *  By: Andrew Quinn
  *      Yiwei Yang
@@ -9,11 +9,11 @@
  *  UC Santa Cruz Sluglab.
  */
 
-#ifndef CXLMEMSIM_BPFTIME_RUNTIME_H
-#define CXLMEMSIM_BPFTIME_RUNTIME_H
+#ifndef LEGOMEM_BPFTIME_RUNTIME_H
+#define LEGOMEM_BPFTIME_RUNTIME_H
 
 #ifdef __cplusplus
-#include "cxlcontroller.h"
+#include "legomemcontroller.h"
 #include <linux/bpf.h>
 #include <string>
 #include <sys/types.h>
@@ -54,7 +54,7 @@ public:
     BpfTimeRuntime(pid_t, std::string);
     ~BpfTimeRuntime();
 
-    int read(CXLController *, BPFTimeRuntimeElem *);
+    int read(LegoMemController *, BPFTimeRuntimeElem *);
     BPFUpdater<uint64_t,uint64_t> *updater;
     pid_t tid;
 };

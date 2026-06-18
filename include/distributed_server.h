@@ -1,6 +1,6 @@
 /*
  * Distributed Multi-Memory Server Header
- * Provides inter-node communication for distributed CXL memory simulation
+ * Provides inter-node communication for distributed LegoMem memory simulation
  * using shared memory message passing between nodes.
  *
  * SPDX-License-Identifier: (LGPL-2.1 OR BSD-2-Clause)
@@ -269,10 +269,10 @@ typedef struct {
 #include "tcp_communication.h"
 
 /* Forward declarations */
-class CXLController;
+class LegoMemController;
 class SharedMemoryManager;
 class CoherencyEngine;
-class HDMDecoder;
+class RegionDecoder;
 struct MHSLDDevice;
 enum class MHSLDCacheState : uint8_t;
 
@@ -540,7 +540,7 @@ private:
     uint16_t tcp_transport_port_;
 
     /* Core components */
-    CXLController* controller_;
+    LegoMemController* controller_;
     std::unique_ptr<SharedMemoryManager> local_memory_;
     std::unique_ptr<DistributedMessageManager> msg_manager_;
     std::unique_ptr<DistributedTCPTransport> tcp_transport_;
@@ -588,7 +588,7 @@ private:
 public:
     DistributedMemoryServer(uint32_t node_id, const std::string& shm_name,
                              int tcp_port, size_t capacity_mb,
-                             CXLController* controller,
+                             LegoMemController* controller,
                              DistTransportMode transport_mode = DistTransportMode::SHM,
                              const std::string& tcp_addr = "0.0.0.0",
                              uint16_t tcp_transport_port = 5555);

@@ -1,5 +1,5 @@
 /*
- * CXLMemSim Unified MOESI Coherency Engine
+ * LegoMem Unified MOESI Coherency Engine
  *
  * Replaces both MHSLDDevice (local multi-headed coherency) and
  * DistributedMHSLDManager (cross-node coherency). Provides a single
@@ -10,8 +10,8 @@
  * UC Santa Cruz Sluglab.
  */
 
-#ifndef CXLMEMSIM_COHERENCY_ENGINE_H
-#define CXLMEMSIM_COHERENCY_ENGINE_H
+#ifndef LEGOMEM_COHERENCY_ENGINE_H
+#define LEGOMEM_COHERENCY_ENGINE_H
 
 #include <cstdint>
 #include <set>
@@ -23,13 +23,13 @@
 #include <atomic>
 
 // Forward declarations
-class HDMDecoder;
+class RegionDecoder;
 class LogPModel;
 class FabricLink;
 class DistributedTCPTransport;
 class DistributedMessageManager;
 
-// Reuse MHSLDCacheState from cxlendpoint.h
+// Reuse MHSLDCacheState from legomemendpoint.h
 enum class MHSLDCacheState : uint8_t;
 
 // Per-head (host port) state
@@ -72,7 +72,7 @@ public:
     static constexpr uint32_t MAX_HEADS = 16;
     static constexpr size_t CACHELINE_SIZE = 64;
 
-    CoherencyEngine(uint32_t local_node, HDMDecoder* decoder, LogPModel* logp,
+    CoherencyEngine(uint32_t local_node, RegionDecoder* decoder, LogPModel* logp,
                     uint32_t max_heads = 16, double bandwidth_gbps = 25.0);
     ~CoherencyEngine() = default;
 
@@ -112,7 +112,7 @@ public:
 
 private:
     uint32_t local_node_id_;
-    HDMDecoder* hdm_decoder_;
+    RegionDecoder* region_decoder_;
     LogPModel* logp_model_;
     DistributedTCPTransport* tcp_transport_ = nullptr;
     DistributedMessageManager* msg_manager_ = nullptr;
@@ -151,4 +151,4 @@ private:
     double calculate_contention_latency(uint32_t head_id, uint64_t ts) const;
 };
 
-#endif // CXLMEMSIM_COHERENCY_ENGINE_H
+#endif // LEGOMEM_COHERENCY_ENGINE_H

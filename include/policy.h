@@ -1,5 +1,5 @@
 /*
- * CXLMemSim policy
+ * LegoMem policy
  *
  *  By: Andrew Quinn
  *      Yiwei Yang
@@ -9,10 +9,10 @@
  *  UC Santa Cruz Sluglab.
  */
 
-#ifndef CXLMEMSIM_POLICY_H
-#define CXLMEMSIM_POLICY_H
-#include "cxlcontroller.h"
-#include "cxlendpoint.h"
+#ifndef LEGOMEM_POLICY_H
+#define LEGOMEM_POLICY_H
+#include "legomemcontroller.h"
+#include "legomemendpoint.h"
 #include "helper.h"
 #include <map>
 #include <random>
@@ -26,7 +26,7 @@ public:
     int last_remote = 0;
     int all_size = 0;
     std::vector<double> percentage;
-    int compute_once(CXLController *) override;
+    int compute_once(LegoMemController *) override;
 };
 
 class NUMAPolicy : public AllocationPolicy {
@@ -34,7 +34,7 @@ class NUMAPolicy : public AllocationPolicy {
 public:
     NUMAPolicy() = default;
     std::vector<double> latency_scores; // 存储每个节点的延迟评分
-    int compute_once(CXLController *) override;
+    int compute_once(LegoMemController *) override;
 };
 
 class HeatAwareMigrationPolicy : public MigrationPolicy {
@@ -47,7 +47,7 @@ public:
     // 记录访问以跟踪热点数据
     void record_access(uint64_t addr) { access_count[addr]++; }
 
-    int compute_once(CXLController *controller) override {
+    int compute_once(LegoMemController *controller) override {
         // 更新访问计数
         for (const auto &[timestamp, info] : controller->occupation) {
             record_access(info.address);
@@ -58,7 +58,7 @@ public:
         return migration_list.empty() ? 0 : 1;
     }
 
-    std::vector<std::tuple<uint64_t, uint64_t>> get_migration_list(CXLController *controller) {
+    std::vector<std::tuple<uint64_t, uint64_t>> get_migration_list(LegoMemController *controller) {
         std::vector<std::tuple<uint64_t, uint64_t>> to_migrate;
 
         // 定义页面大小
@@ -144,7 +144,7 @@ public:
     TLBCache tlb_4k; // 4KB页面的TLB
     TLBCache tlb_2m; // 2MB页面的TLB
     TLBCache tlb_1g; // 1GB页面的TLB
-    CXLHugePageEvent stats; // 统计信息
+    LegoMemHugePageEvent stats; // 统计信息
     explicit HugePagePolicy(uint64_t local_latency = 100, uint64_t remote_latency = 300)
         : ptw_base_latency_local(local_latency), ptw_base_latency_remote(remote_latency),
           tlb_4k(64), // 4KB页面TLB容量(较大)
@@ -245,7 +245,7 @@ public:
         return base_latency * ptw_reduction;
     }
 
-    int compute_once(CXLController *controller) override {
+    int compute_once(LegoMemController *controller) override {
         // 分析内存访问模式以决定是否应该合并为大页
         std::unordered_map<uint64_t, std::vector<uint64_t>> page_groups;
         size_t potential_huge_pages = 0;
@@ -337,7 +337,7 @@ public:
     uint64_t ptw_latency_local; // 本地内存页表遍历延迟
     uint64_t ptw_latency_remote; // 远程内存页表遍历延迟
     // 缓存命中率统计
-    CXLPageTableEvent cache_stats;
+    LegoMemPageTableEvent cache_stats;
     // 最近检查时间戳（用于周期性清理）
     uint64_t last_cleanup_timestamp;
     // 清理间隔
@@ -348,7 +348,7 @@ public:
         : ptw_latency_local(local_latency), ptw_latency_remote(remote_latency), last_cleanup_timestamp(0),
           cleanup_interval(cleanup_interval) {}
 
-    int compute_once(CXLController *controller) override {
+    int compute_once(LegoMemController *controller) override {
         uint64_t current_timestamp = controller->last_timestamp;
 
         // 周期性清理缓存
@@ -422,8 +422,8 @@ public:
 class FIFOPolicy : public CachingPolicy {
 public:
     FIFOPolicy() = default;
-    int compute_once(CXLController *) override;
-    std::vector<uint64_t> get_invalidation_list(CXLController *controller) override {
+    int compute_once(LegoMemController *) override;
+    std::vector<uint64_t> get_invalidation_list(LegoMemController *controller) override {
         std::vector<uint64_t> to_invalidate;
         for (const auto &[timestamp, info] : controller->occupation) {
             to_invalidate.push_back(info.address);
@@ -452,9 +452,9 @@ public:
     bool should_cache(uint64_t addr, uint64_t timestamp);
     bool should_invalidate(uint64_t addr, uint64_t timestamp);
 
-    std::vector<uint64_t> get_invalidation_list(CXLController *controller);
+    std::vector<uint64_t> get_invalidation_list(LegoMemController *controller);
 
-    int compute_once(CXLController *controller) override;
+    int compute_once(LegoMemController *controller) override;
 };
 // 基于访问频率的迁移策略
 class FrequencyBasedMigrationPolicy : public MigrationPolicy {
@@ -472,7 +472,7 @@ public:
     // 记录访问以跟踪访问频率
     void record_access(uint64_t addr) { access_count[addr]++; }
 
-    int compute_once(CXLController *controller) override {
+    int compute_once(LegoMemController *controller) override {
         // 更新访问计数
         for (const auto &[timestamp, info] : controller->occupation) {
             record_access(info.address);
@@ -490,7 +490,7 @@ public:
         return migration_list.empty() ? 0 : 1;
     }
 
-    std::vector<std::tuple<uint64_t, uint64_t>> get_migration_list(CXLController *controller) {
+    std::vector<std::tuple<uint64_t, uint64_t>> get_migration_list(LegoMemController *controller) {
         std::vector<std::tuple<uint64_t, uint64_t>> to_migrate;
 
         // 定义页面大小
@@ -520,7 +520,7 @@ public:
         }
 
         // 从扩展器中查找热数据
-        auto collect_hot_data = [this, &to_migrate, per_size](CXLMemExpander *expander) {
+        auto collect_hot_data = [this, &to_migrate, per_size](LegoMemMemoryEndpoint *expander) {
             for (const auto &info : expander->occupation) {
                 uint64_t addr = info.address;
                 if (access_count[addr] > hot_threshold) {
@@ -536,8 +536,8 @@ public:
         }
 
         // 递归收集子交换机下的扩展器中的热数据
-        std::function<void(CXLSwitch *)> collect_from_switch = [&collect_hot_data,
-                                                                &collect_from_switch](CXLSwitch *sw) {
+        std::function<void(LegoMemSwitch *)> collect_from_switch = [&collect_hot_data,
+                                                                &collect_from_switch](LegoMemSwitch *sw) {
             if (!sw)
                 return;
 
@@ -566,7 +566,7 @@ public:
     LoadBalancingMigrationPolicy(double threshold = 0.2, uint64_t interval = 5000000)
         : imbalance_threshold(threshold), migration_interval(interval), last_migration(0) {}
 
-    int compute_once(CXLController *controller) override {
+    int compute_once(LegoMemController *controller) override {
         // 检查是否到达迁移间隔
         uint64_t current_time = controller->last_timestamp;
         if (current_time - last_migration < migration_interval) {
@@ -578,7 +578,7 @@ public:
 
         // 计算所有扩展器的负载
         struct DeviceLoad {
-            CXLMemExpander *expander;
+            LegoMemMemoryEndpoint *expander;
             uint64_t load;
         };
 
@@ -591,7 +591,7 @@ public:
         }
 
         // 递归收集所有子交换机下的扩展器的负载
-        std::function<void(CXLSwitch *)> collect_loads = [&expander_loads, &collect_loads](CXLSwitch *sw) {
+        std::function<void(LegoMemSwitch *)> collect_loads = [&expander_loads, &collect_loads](LegoMemSwitch *sw) {
             if (!sw)
                 return;
 
@@ -618,8 +618,8 @@ public:
         auto min_it = std::min_element(expander_loads.begin(), expander_loads.end(),
                                        [](const DeviceLoad &a, const DeviceLoad &b) { return a.load < b.load; });
 
-        CXLMemExpander *highest_load_expander = max_it->expander;
-        CXLMemExpander *lowest_load_expander = min_it->expander;
+        LegoMemMemoryEndpoint *highest_load_expander = max_it->expander;
+        LegoMemMemoryEndpoint *lowest_load_expander = min_it->expander;
         uint64_t highest_load = max_it->load;
         uint64_t lowest_load = min_it->load;
 
@@ -633,7 +633,7 @@ public:
         return 0;
     }
 
-    std::vector<std::tuple<uint64_t, uint64_t>> get_migration_list(CXLController *controller) {
+    std::vector<std::tuple<uint64_t, uint64_t>> get_migration_list(LegoMemController *controller) {
         std::vector<std::tuple<uint64_t, uint64_t>> to_migrate;
 
         // 定义页面大小
@@ -655,14 +655,14 @@ public:
 
         // 计算所有扩展器的负载
         struct DeviceLoad {
-            CXLMemExpander *expander;
+            LegoMemMemoryEndpoint *expander;
             uint64_t load;
         };
 
         std::vector<DeviceLoad> expander_loads;
 
         // 收集所有扩展器的负载
-        auto collect_all_loads = [&expander_loads](CXLMemExpander *expander) {
+        auto collect_all_loads = [&expander_loads](LegoMemMemoryEndpoint *expander) {
             uint64_t load = expander->counter.load + expander->counter.store;
             expander_loads.push_back({expander, load});
         };
@@ -673,7 +673,7 @@ public:
         }
 
         // 递归收集子交换机的扩展器
-        std::function<void(CXLSwitch *)> collect_loads = [&collect_all_loads, &collect_loads](CXLSwitch *sw) {
+        std::function<void(LegoMemSwitch *)> collect_loads = [&collect_all_loads, &collect_loads](LegoMemSwitch *sw) {
             if (!sw)
                 return;
 
@@ -699,8 +699,8 @@ public:
         auto min_it = std::min_element(expander_loads.begin(), expander_loads.end(),
                                        [](const DeviceLoad &a, const DeviceLoad &b) { return a.load < b.load; });
 
-        CXLMemExpander *highest_load_expander = max_it->expander;
-        CXLMemExpander *lowest_load_expander = min_it->expander;
+        LegoMemMemoryEndpoint *highest_load_expander = max_it->expander;
+        LegoMemMemoryEndpoint *lowest_load_expander = min_it->expander;
 
         // 从负载最高的设备选取一些数据迁移到负载最低的设备
         int migration_count = 0;
@@ -748,7 +748,7 @@ public:
         return false;
     }
 
-    int compute_once(CXLController *controller) override {
+    int compute_once(LegoMemController *controller) override {
         // 更新访问模式
         for (const auto &[timestamp, info] : controller->occupation) {
             record_access(info.address);
@@ -759,7 +759,7 @@ public:
         return migration_list.empty() ? 0 : 1;
     }
 
-    std::vector<std::tuple<uint64_t, uint64_t>> get_migration_list(CXLController *controller) {
+    std::vector<std::tuple<uint64_t, uint64_t>> get_migration_list(LegoMemController *controller) {
         std::vector<std::tuple<uint64_t, uint64_t>> to_migrate;
 
         // 遍历所有页面的访问模式
@@ -794,13 +794,13 @@ public:
 
     LifetimeBasedMigrationPolicy(uint64_t threshold = 1000000) : lifetime_threshold(threshold) {}
 
-    int compute_once(CXLController *controller) override {
+    int compute_once(LegoMemController *controller) override {
         // 获取迁移列表
         auto migration_list = get_migration_list(controller);
         return migration_list.empty() ? 0 : 1;
     }
 
-    std::vector<std::tuple<uint64_t, uint64_t>> get_migration_list(CXLController *controller) {
+    std::vector<std::tuple<uint64_t, uint64_t>> get_migration_list(LegoMemController *controller) {
         std::vector<std::tuple<uint64_t, uint64_t>> to_migrate;
 
         // 定义页面大小
@@ -844,7 +844,7 @@ public:
     // 添加策略
     void add_policy(MigrationPolicy *policy) { policies.push_back(policy); }
 
-    int compute_once(CXLController *controller) override {
+    int compute_once(LegoMemController *controller) override {
         int result = 0;
 
         // 运行所有策略
@@ -855,7 +855,7 @@ public:
         return result;
     }
 
-    std::vector<std::tuple<uint64_t, uint64_t>> get_migration_list(CXLController *controller) {
+    std::vector<std::tuple<uint64_t, uint64_t>> get_migration_list(LegoMemController *controller) {
         std::vector<std::tuple<uint64_t, uint64_t>> to_migrate;
 
         // 收集所有策略的迁移列表
@@ -871,4 +871,4 @@ public:
         return to_migrate;
     }
 };
-#endif // CXLMEMSIM_POLICY_H
+#endif // LEGOMEM_POLICY_H

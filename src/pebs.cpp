@@ -1,5 +1,5 @@
 /*
- * CXLMemSim pebs
+ * LegoMem pebs
  *
  *  By: Andrew Quinn
  *      Yiwei Yang
@@ -60,7 +60,7 @@ PEBS::PEBS(pid_t pid, uint64_t sample_period) : pid(pid), sample_period(sample_p
         throw;
     }
 }
-int PEBS::read(CXLController *controller, PEBSElem *elem) {
+int PEBS::read(LegoMemController *controller, PEBSElem *elem) {
     if (this->fd < 0) {
         return 0;
     }

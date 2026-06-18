@@ -1,5 +1,5 @@
 /*
- * CXLMemSim controller
+ * LegoMem controller
  *
  *  By: Andrew Quinn
  *      Yiwei Yang
@@ -9,11 +9,11 @@
  *  UC Santa Cruz Sluglab.
  */
 
-#ifndef CXLMEMSIM_CXLCONTROLLER_H
-#define CXLMEMSIM_CXLCONTROLLER_H
+#ifndef LEGOMEM_CONTROLLER_H
+#define LEGOMEM_CONTROLLER_H
 
-#include "cxlendpoint.h"
-#include "hdm_decoder.h"
+#include "legomemendpoint.h"
+#include "region_decoder.h"
 #include "coherency_engine.h"
 #include "lbr.h"
 #include <memory>
@@ -32,14 +32,14 @@ class Policy {
 public:
     virtual ~Policy() = default;
     Policy() = default;
-    virtual int compute_once(CXLController *) = 0; // reader writer
+    virtual int compute_once(LegoMemController *) = 0; // reader writer
 };
 
 class AllocationPolicy : public Policy {
 public:
     AllocationPolicy();
     virtual ~AllocationPolicy() = default;
-    int compute_once(CXLController *controller) override { return 0; };
+    int compute_once(LegoMemController *controller) override { return 0; };
 };
 
 class MigrationPolicy : public Policy {
@@ -49,14 +49,14 @@ public:
 
     // 基本的compute_once方法，决定是否需要执行迁移
     // Basic compute_once method, determines whether migration should be executed
-    int compute_once(CXLController *controller) override {
+    int compute_once(LegoMemController *controller) override {
         auto migration_list = get_migration_list(controller);
         return migration_list.empty() ? 0 : 1;
     }
 
     // 获取需要迁移的地址列表
     // Get the list of addresses that need migration
-    std::vector<std::tuple<uint64_t, uint64_t>> get_migration_list(CXLController *controller) {
+    std::vector<std::tuple<uint64_t, uint64_t>> get_migration_list(LegoMemController *controller) {
         std::vector<std::tuple<uint64_t, uint64_t>> migration_list;
         // 基类提供空实现
         // Base class provides empty implementation
@@ -68,7 +68,7 @@ public:
 
     // 为给定地址选择最佳的目标设备
     // Select the best target device for a given address
-    virtual int select_target_device(uint64_t addr, int current_device, CXLController *controller) {
+    virtual int select_target_device(uint64_t addr, int current_device, LegoMemController *controller) {
         return -1; // -1表示不迁移
                    // -1 means no migration
     }
@@ -78,7 +78,7 @@ public:
 class PagingPolicy : public Policy {
 public:
     PagingPolicy();
-    int compute_once(CXLController *) override { return 0; };
+    int compute_once(LegoMemController *) override { return 0; };
     // paging related
     virtual uint64_t check_page_table_walk(uint64_t virt_addr, uint64_t phys_addr, bool is_remote, page_type pt) {
         return 0;
@@ -89,7 +89,7 @@ class CachingPolicy : public Policy {
 public:
     CachingPolicy();
     virtual ~CachingPolicy() = default;
-    int compute_once(CXLController *) override { return 0; };
+    int compute_once(LegoMemController *) override { return 0; };
 
     // 判断是否应该缓存数据
     // Determine if data should be cached
@@ -107,7 +107,7 @@ public:
 
     // 获取需要失效的地址列表
     // Get the list of addresses that need invalidation
-    virtual std::vector<uint64_t> get_invalidation_list(CXLController *controller) {
+    virtual std::vector<uint64_t> get_invalidation_list(LegoMemController *controller) {
         return {}; // 默认行为，可以被子类覆盖
                    // Default behavior, can be overridden by subclasses
     }
@@ -219,15 +219,15 @@ public:
     }
 };
 
-class CXLController : public CXLSwitch {
+class LegoMemController : public LegoMemSwitch {
 public:
-    std::vector<CXLMemExpander *> cur_expanders{};
+    std::vector<LegoMemMemoryEndpoint *> cur_expanders{};
     int capacity; // GB
     AllocationPolicy *allocation_policy{};
     MigrationPolicy *migration_policy{};
     PagingPolicy *paging_policy{};
     CachingPolicy *caching_policy{};
-    CXLCounter counter;
+    LegoMemCounter counter;
     std::map<uint64_t, occupation_info> occupation;
     page_type page_type_; // percentage
     // no need for va pa map because v-indexed will not caught by us
@@ -238,7 +238,7 @@ public:
     double latency_lat{};
     double bandwidth_lat{};
     double dramlatency;
-    std::unordered_map<int, CXLMemExpander *> device_map;
+    std::unordered_map<int, LegoMemMemoryEndpoint *> device_map;
     // ring buffer
     std::queue<lbr> ring_buffer;
     // rob info
@@ -254,14 +254,14 @@ public:
 
     // Distributed topology support
     uint32_t local_node_id_ = 0;
-    std::unique_ptr<HDMDecoder> hdm_decoder_;
+    std::unique_ptr<RegionDecoder> region_decoder_;
     std::unique_ptr<CoherencyEngine> coherency_;
-    std::vector<RemoteCXLExpander*> remote_expanders_;
+    std::vector<RemoteLegoMemEndpoint*> remote_expanders_;
 
-    explicit CXLController(std::array<Policy *, 4> p, int capacity, page_type page_type_, int epoch,
+    explicit LegoMemController(std::array<Policy *, 4> p, int capacity, page_type page_type_, int epoch,
                            double dramlatency);
     void construct_topo(std::string_view newick_tree);
-    void insert_end_point(CXLMemExpander *end_point);
+    void insert_end_point(LegoMemMemoryEndpoint *end_point);
     std::vector<std::string> tokenize(const std::string_view &s);
     std::tuple<double, std::vector<uint64_t>> calculate_congestion() override;
     void set_epoch(int epoch) override;
@@ -281,7 +281,7 @@ public:
     void update_cache(uint64_t addr, uint64_t value, uint64_t timestamp) { lru_cache.put(addr, value, timestamp); }
     void perform_back_invalidation();
     void invalidate_in_expanders(uint64_t addr);
-    void invalidate_in_switch(CXLSwitch *switch_, uint64_t addr);
+    void invalidate_in_switch(LegoMemSwitch *switch_, uint64_t addr);
 
     // LogP model configuration and access
     void configure_logp(const LogPConfig& config);
@@ -301,28 +301,28 @@ public:
                                          uint32_t head_id, uint32_t target_node);
 
     // Distributed topology configuration
-    void configure_distributed(uint32_t local_node_id, HDMDecoderMode mode);
-    RemoteCXLExpander* add_remote_endpoint(uint32_t remote_node, uint64_t base,
+    void configure_distributed(uint32_t local_node_id, RegionDecoderMode mode);
+    RemoteLegoMemEndpoint* add_remote_endpoint(uint32_t remote_node, uint64_t base,
                                             uint64_t capacity, const FabricLinkConfig& link_cfg);
-    RemoteCXLExpander* get_remote_expander(uint32_t node_id);
+    RemoteLegoMemEndpoint* get_remote_expander(uint32_t node_id);
 };
 
-// C++20 std::formatter for CXLController
-template <> struct std::formatter<CXLController> {
+// C++20 std::formatter for LegoMemController
+template <> struct std::formatter<LegoMemController> {
     constexpr auto parse(std::format_parse_context &ctx) -> decltype(ctx.begin()) {
         return ctx.end();
     }
 
     template <typename FormatContext>
-    auto format(const CXLController &controller, FormatContext &ctx) const -> decltype(ctx.out()) {
+    auto format(const LegoMemController &controller, FormatContext &ctx) const -> decltype(ctx.out()) {
         std::string result;
 
         // 首先打印控制器自身的计数器信息
-        result += "CXLController:\n";
+        result += "LegoMemController:\n";
         // iterate through the topology map
         uint64_t total_capacity = 0;
 
-        std::function<void(const CXLSwitch *)> dfs_capacity = [&](const CXLSwitch *node) {
+        std::function<void(const LegoMemSwitch *)> dfs_capacity = [&](const LegoMemSwitch *node) {
             if (!node)
                 return;
 
@@ -367,7 +367,7 @@ template <> struct std::formatter<CXLController> {
         result += "Topology:\n";
 
         // 递归打印每个交换机
-        std::function<void(const CXLSwitch *, int)> print_switch = [&result, &print_switch](const CXLSwitch *sw,
+        std::function<void(const LegoMemSwitch *, int)> print_switch = [&result, &print_switch](const LegoMemSwitch *sw,
                                                                                             int depth) {
             std::string indent(depth * 2, ' ');
 
@@ -409,5 +409,5 @@ template <> struct std::formatter<CXLController> {
     }
 };
 
-extern CXLController *controller;
-#endif // CXLMEMSIM_CXLCONTROLLER_H
+extern LegoMemController *controller;
+#endif // LEGOMEM_CONTROLLER_H

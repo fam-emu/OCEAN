@@ -1,5 +1,5 @@
 /*
- * CXLMemSim lbr
+ * LegoMem lbr
  *
  *  By: Andrew Quinn
  *      Yiwei Yang
@@ -9,8 +9,8 @@
  *  UC Santa Cruz Sluglab.
  */
 
-#ifndef CXLMEMSIM_LBR_H
-#define CXLMEMSIM_LBR_H
+#ifndef LEGOMEM_LBR_H
+#define LEGOMEM_LBR_H
 
 // 2 bits
 #define LBR_DATA_MASK 0x0000000000000003
@@ -19,11 +19,11 @@
 #define LBR_INS_MASK 0xfffffff0000
 #define LBR_INS_SHIFT 16
 
-#include "cxlcontroller.h"
+#include "legomemcontroller.h"
 #include "helper.h"
 #include <linux/perf_event.h>
 #include <sys/mman.h>
-class CXLController; // Forward declaration
+class LegoMemController; // Forward declaration
 
 struct lbr {
     uint64_t from;
@@ -56,9 +56,9 @@ public:
     perf_event_mmap_page *mp;
     explicit LBR(pid_t, uint64_t);
     ~LBR();
-    int read(CXLController *, LBRElem *);
+    int read(LegoMemController *, LBRElem *);
     int start() const;
     int stop() const;
 };
 
-#endif // CXLMEMSIM_LBR_H
+#endif // LEGOMEM_LBR_H

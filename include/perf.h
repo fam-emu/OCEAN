@@ -1,5 +1,5 @@
 /*
- * CXLMemSim perf
+ * LegoMem perf
  *
  *  By: Andrew Quinn
  *      Yiwei Yang
@@ -9,8 +9,8 @@
  *  UC Santa Cruz Sluglab.
  */
 
-#ifndef CXLMEMSIM_PERF_H
-#define CXLMEMSIM_PERF_H
+#ifndef LEGOMEM_PERF_H
+#define LEGOMEM_PERF_H
 
 #include <bpf/bpf.h>
 #include <cstdint>
@@ -47,4 +47,4 @@ public:
 
 PerfInfo *init_incore_perf(const pid_t pid, const int cpu, uint64_t conf, uint64_t conf1);
 PerfInfo *init_uncore_perf(const pid_t pid, const int cpu, uint64_t conf, uint64_t conf1, int value);
-#endif // CXLMEMSIM_PERF_H
+#endif // LEGOMEM_PERF_H

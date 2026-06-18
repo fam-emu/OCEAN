@@ -3,12 +3,12 @@
 #include <iostream>
 
 Helper helper{};
-CXLController *controller;
+LegoMemController *controller;
 Monitors *monitors;
 int main() {
     // Create a controller with minimal configuration
     auto *policy1 = new InterleavePolicy();
-    auto *controller = new CXLController({policy1}, 0, CACHELINE, 100, 110);
+    auto *controller = new LegoMemController({policy1}, 0, CACHELINE, 100, 110);
 
     // Create ROB with the controller
     Rob rob(controller, 512);

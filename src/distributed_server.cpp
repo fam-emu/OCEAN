@@ -1,6 +1,6 @@
 /*
  * Distributed Multi-Memory Server Implementation
- * Provides inter-node communication for distributed CXL memory simulation
+ * Provides inter-node communication for distributed LegoMem memory simulation
  * using shared memory message passing between nodes.
  *
  * SPDX-License-Identifier: (LGPL-2.1 OR BSD-2-Clause)
@@ -11,8 +11,8 @@
 #include "distributed_server.h"
 #include "shared_memory_manager.h"
 #include "coherency_engine.h"
-#include "cxlcontroller.h"
-#include "hdm_decoder.h"
+#include "legomemcontroller.h"
+#include "region_decoder.h"
 #include <algorithm>
 #include <arpa/inet.h>
 #include <chrono>
@@ -26,7 +26,7 @@
 #include <sys/stat.h>
 #include <unistd.h>
 
-/* TCP Client Request/Response structures (matching QEMU's cxl_type3.c) */
+/* TCP Client Request/Response structures (matching QEMU's legomem_type3.c) */
 struct __attribute__((packed)) DistServerRequest {
     uint8_t op_type;      /* 0=READ, 1=WRITE, 2=GET_SHM_INFO, 3=ATOMIC_FAA, 4=ATOMIC_CAS, 5=FENCE */
     uint64_t addr;
@@ -490,7 +490,7 @@ DistributedMessageManager::Stats DistributedMessageManager::get_stats() const {
 
 DistributedMemoryServer::DistributedMemoryServer(uint32_t node_id, const std::string& shm_name,
                                                    int tcp_port, size_t capacity_mb,
-                                                   CXLController* controller,
+                                                   LegoMemController* controller,
                                                    DistTransportMode transport_mode,
                                                    const std::string& tcp_addr,
                                                    uint16_t tcp_transport_port)
@@ -499,7 +499,7 @@ DistributedMemoryServer::DistributedMemoryServer(uint32_t node_id, const std::st
       tcp_addr_(tcp_addr), tcp_transport_port_(tcp_transport_port),
       controller_(controller),
       lsa_coordinator_port_(static_cast<uint16_t>(tcp_port)),
-      lsa_size_(256 * 1024),  /* 256KB default LSA size per CXL spec */
+      lsa_size_(256 * 1024),  /* 256KB default LSA size per LegoMem spec */
       tcp_server_fd_(-1), next_client_id_(0),
       running_(false), state_(NODE_STATE_UNKNOWN),
       local_reads_(0), local_writes_(0), remote_reads_(0), remote_writes_(0),
@@ -581,7 +581,7 @@ bool DistributedMemoryServer::initialize() {
         num_nodes = 2;
     }
     LogPConfig logp_cfg(
-        150.0,   // L: 150ns network latency (typical CXL switch hop)
+        150.0,   // L: 150ns network latency (typical LegoMem switch hop)
         20.0,    // o_s: 20ns sender overhead
         20.0,    // o_r: 20ns receiver overhead
         4.0,     // g: 4ns gap (250MHz message rate)
@@ -589,14 +589,14 @@ bool DistributedMemoryServer::initialize() {
     );
     controller_->configure_logp(logp_cfg);
 
-    // Configure controller for distributed mode with HDM decoder + CoherencyEngine
+    // Configure controller for distributed mode with Region decoder + CoherencyEngine
     // Use HYBRID mode for TCP: tries range-based first (from add_range), then interleaved
-    HDMDecoderMode hdm_mode = (transport_mode_ == DistTransportMode::TCP)
-        ? HDMDecoderMode::HYBRID : HDMDecoderMode::RANGE_BASED;
-    controller_->configure_distributed(node_id_, hdm_mode);
+    RegionDecoderMode region_mode = (transport_mode_ == DistTransportMode::TCP)
+        ? RegionDecoderMode::HYBRID : RegionDecoderMode::RANGE_BASED;
+    controller_->configure_distributed(node_id_, region_mode);
 
-    // Add local range to HDM decoder
-    controller_->hdm_decoder_->add_range(shm_info.base_addr, shm_info.size, node_id_, false);
+    // Add local range to Region decoder
+    controller_->region_decoder_->add_range(shm_info.base_addr, shm_info.size, node_id_, false);
 
     // Initialize TCP transport if requested
     if (transport_mode_ == DistTransportMode::TCP || transport_mode_ == DistTransportMode::HYBRID) {
@@ -1046,8 +1046,8 @@ void DistributedMemoryServer::process_requests_loop() {
 }
 
 uint32_t DistributedMemoryServer::get_node_for_address(uint64_t addr) const {
-    if (controller_->hdm_decoder_) {
-        return controller_->hdm_decoder_->get_home_node(addr);
+    if (controller_->region_decoder_) {
+        return controller_->region_decoder_->get_home_node(addr);
     }
     // Fallback: assume local
     return node_id_;
@@ -1596,8 +1596,8 @@ bool DistributedMemoryServer::connect_tcp_node(uint32_t node_id, const std::stri
     remote->msg_manager_ = msg_manager_ ? msg_manager_.get() : nullptr;
     remote->coherency_engine_ = controller_->coherency_.get();
 
-    // Register in HDM decoder
-    controller_->hdm_decoder_->add_range(peer_base_addr, peer_capacity, node_id, true);
+    // Register in Region decoder
+    controller_->region_decoder_->add_range(peer_base_addr, peer_capacity, node_id, true);
 
     // Register fabric link with coherency engine
     controller_->coherency_->register_fabric_link(node_id, remote->fabric_link_.get());
@@ -2161,7 +2161,7 @@ TCPCalibrationResult DistributedTCPTransport::get_aggregate_calibration() const 
  * ============================================================================ */
 
 #if 0  // DistributedMHSLDManager removed
-DistributedMHSLDManager_removed::DistributedMHSLDManager(CXLController* ctrl,
+DistributedMHSLDManager_removed::DistributedMHSLDManager(LegoMemController* ctrl,
                                                    DistributedTCPTransport* tcp,
                                                    DistributedMessageManager* msg_mgr,
                                                    uint32_t node_id, uint32_t head_id)

@@ -1,5 +1,5 @@
 /*
- * CXLMemSim controller
+ * LegoMem controller
  *
  *  By: Andrew Quinn
  *      Yiwei Yang
@@ -9,16 +9,16 @@
  *  UC Santa Cruz Sluglab.
  */
 
-#include "cxlcontroller.h"
+#include "legomemcontroller.h"
 #include "lbr.h"
 #include "monitor.h"
 #include "../include/distributed_server.h"
 
-void CXLController::insert_end_point(CXLMemExpander *end_point) { this->cur_expanders.emplace_back(end_point); }
+void LegoMemController::insert_end_point(LegoMemMemoryEndpoint *end_point) { this->cur_expanders.emplace_back(end_point); }
 
-void CXLController::construct_topo(std::string_view newick_tree) {
+void LegoMemController::construct_topo(std::string_view newick_tree) {
     auto tokens = tokenize(newick_tree);
-    std::vector<CXLSwitch *> stk;
+    std::vector<LegoMemSwitch *> stk;
     stk.push_back(this);
     for (size_t t = 0; t < tokens.size(); t++) {
         const auto &token = tokens[t];
@@ -26,7 +26,7 @@ void CXLController::construct_topo(std::string_view newick_tree) {
             num_switches++;
         } else if (token == "(") {
             /** if is not on the top level */
-            auto cur = new CXLSwitch(num_switches++);
+            auto cur = new LegoMemSwitch(num_switches++);
             stk.back()->switches.push_back(cur);
             stk.push_back(cur);
         } else if (token == ")") {
@@ -38,7 +38,7 @@ void CXLController::construct_topo(std::string_view newick_tree) {
         } else if (token == "," || token == ";") {
         } else if (token == "R" && t + 4 < tokens.size() &&
                    tokens[t+1] == ":" && tokens[t+3] == ":") {
-            // R:node_id:exp_id - creates RemoteCXLExpander
+            // R:node_id:exp_id - creates RemoteLegoMemEndpoint
             uint32_t remote_node = static_cast<uint32_t>(atoi(tokens[t+2].c_str()));
             // Use default link config; can be overridden later
             FabricLinkConfig link_cfg{100.0, 25.0, 32};
@@ -55,9 +55,9 @@ void CXLController::construct_topo(std::string_view newick_tree) {
     }
 }
 
-CXLController::CXLController(std::array<Policy *, 4> p, int capacity, page_type page_type_, int epoch,
+LegoMemController::LegoMemController(std::array<Policy *, 4> p, int capacity, page_type page_type_, int epoch,
                              double dramlatency)
-    : CXLSwitch(0), capacity(capacity), allocation_policy(dynamic_cast<AllocationPolicy *>(p[0])),
+    : LegoMemSwitch(0), capacity(capacity), allocation_policy(dynamic_cast<AllocationPolicy *>(p[0])),
       migration_policy(dynamic_cast<MigrationPolicy *>(p[1])), paging_policy(dynamic_cast<PagingPolicy *>(p[2])),
       caching_policy(dynamic_cast<CachingPolicy *>(p[3])), page_type_(page_type_), dramlatency(dramlatency),
       lru_cache(32 * 1024 * 1024 / 64) {
@@ -69,15 +69,15 @@ CXLController::CXLController(std::array<Policy *, 4> p, int capacity, page_type 
     }
 }
 
-double CXLController::calculate_latency(const std::vector<std::tuple<uint64_t, uint64_t>> &elem, double dramlatency) {
-    return CXLSwitch::calculate_latency(elem, dramlatency);
+double LegoMemController::calculate_latency(const std::vector<std::tuple<uint64_t, uint64_t>> &elem, double dramlatency) {
+    return LegoMemSwitch::calculate_latency(elem, dramlatency);
 }
 
-double CXLController::calculate_bandwidth(const std::vector<std::tuple<uint64_t, uint64_t>> &elem) {
-    return CXLSwitch::calculate_bandwidth(elem);
+double LegoMemController::calculate_bandwidth(const std::vector<std::tuple<uint64_t, uint64_t>> &elem) {
+    return LegoMemSwitch::calculate_bandwidth(elem);
 }
 
-void CXLController::perform_migration() {
+void LegoMemController::perform_migration() {
     if (!migration_policy)
         return;
 
@@ -87,7 +87,7 @@ void CXLController::perform_migration() {
     // 对每个迁移项执行迁移
     for (const auto &[addr, size] : migration_list) {
         // 查找当前地址所在的设备
-        CXLMemExpander *src_expander = nullptr;
+        LegoMemMemoryEndpoint *src_expander = nullptr;
         int src_id = -1;
 
         // 检查当前地址是否在控制器本地
@@ -114,8 +114,8 @@ void CXLController::perform_migration() {
 
             // 如果还没找到，递归搜索所有交换机
             if (!src_expander) {
-                std::function<CXLMemExpander *(CXLSwitch *, uint64_t)> find_in_switch =
-                    [&find_in_switch](CXLSwitch *sw, uint64_t addr) -> CXLMemExpander * {
+                std::function<LegoMemMemoryEndpoint *(LegoMemSwitch *, uint64_t)> find_in_switch =
+                    [&find_in_switch](LegoMemSwitch *sw, uint64_t addr) -> LegoMemMemoryEndpoint * {
                     if (!sw)
                         return nullptr;
 
@@ -130,7 +130,7 @@ void CXLController::perform_migration() {
 
                     // 递归检查子交换机
                     for (auto child_sw : sw->switches) {
-                        CXLMemExpander *result = find_in_switch(child_sw, addr);
+                        LegoMemMemoryEndpoint *result = find_in_switch(child_sw, addr);
                         if (result)
                             return result;
                     }
@@ -148,7 +148,7 @@ void CXLController::perform_migration() {
             // 如果数据已在控制器中，选择一个负载较轻的扩展器
             // 这里简单地选择第一个扩展器
             if (!expanders.empty()) {
-                CXLMemExpander *dst_expander = expanders[0];
+                LegoMemMemoryEndpoint *dst_expander = expanders[0];
 
                 // 从控制器迁移到扩展器
                 for (auto it = occupation.begin(); it != occupation.end(); ++it) {
@@ -190,9 +190,9 @@ void CXLController::perform_migration() {
     }
 }
 
-void CXLController::delete_entry(uint64_t addr, uint64_t length) { CXLSwitch::delete_entry(addr, length); }
+void LegoMemController::delete_entry(uint64_t addr, uint64_t length) { LegoMemSwitch::delete_entry(addr, length); }
 
-void CXLController::insert_one(thread_info &t_info, lbr &lbr) {
+void LegoMemController::insert_one(thread_info &t_info, lbr &lbr) {
     auto &rob = t_info.rob;
     auto llcm_count = (lbr.flags & LBR_DATA_MASK) >> LBR_DATA_SHIFT;
     auto ins_count = (lbr.flags & LBR_INS_MASK) >> LBR_INS_SHIFT;
@@ -229,7 +229,7 @@ void CXLController::insert_one(thread_info &t_info, lbr &lbr) {
     }
 }
 
-int CXLController::insert(uint64_t timestamp, uint64_t tid, uint64_t phys_addr, uint64_t virt_addr, int index) {
+int LegoMemController::insert(uint64_t timestamp, uint64_t tid, uint64_t phys_addr, uint64_t virt_addr, int index) {
     auto &t_info = thread_map[tid];
 
     // 计算时间步长
@@ -254,9 +254,9 @@ int CXLController::insert(uint64_t timestamp, uint64_t tid, uint64_t phys_addr, 
             continue;
         }
 
-        // HDM Decoder routing path (distributed mode)
-        if (hdm_decoder_) {
-            auto decode_result = hdm_decoder_->decode(phys_addr);
+        // Region Decoder routing path (distributed mode)
+        if (region_decoder_) {
+            auto decode_result = region_decoder_->decode(phys_addr);
 
             // 检查是否需要页表遍历
             uint64_t ptw_latency = 0;
@@ -269,7 +269,7 @@ int CXLController::insert(uint64_t timestamp, uint64_t tid, uint64_t phys_addr, 
             }
 
             if (decode_result.is_remote) {
-                // Remote access via RemoteCXLExpander
+                // Remote access via RemoteLegoMemEndpoint
                 auto* remote = get_remote_expander(decode_result.target_id);
                 if (remote) {
                     remote->insert(current_timestamp + ptw_latency, tid, phys_addr, virt_addr, remote->id);
@@ -277,7 +277,7 @@ int CXLController::insert(uint64_t timestamp, uint64_t tid, uint64_t phys_addr, 
                 this->counter.inc_remote();
                 t_info.llcm_type.push(1);
             } else {
-                // Local access routed by HDM decoder
+                // Local access routed by Region decoder
                 auto it = device_map.find(decode_result.target_id);
                 if (it != device_map.end()) {
                     it->second->insert(current_timestamp + ptw_latency, tid, phys_addr, virt_addr, it->second->id);
@@ -347,7 +347,7 @@ int CXLController::insert(uint64_t timestamp, uint64_t tid, uint64_t phys_addr, 
     return res;
 }
 
-int CXLController::insert(uint64_t timestamp, uint64_t tid, lbr lbrs[32], cntr counters[32]) {
+int LegoMemController::insert(uint64_t timestamp, uint64_t tid, lbr lbrs[32], cntr counters[32]) {
     // 处理LBR记录
     for (int i = 0; i < 32; i++) {
         if (!lbrs[i].from) {
@@ -361,7 +361,7 @@ int CXLController::insert(uint64_t timestamp, uint64_t tid, lbr lbrs[32], cntr c
 
     // 对每个endpoint计算延迟并累加
     double total_latency = 0.0;
-    std::function<void(CXLSwitch *)> dfs_calculate = [&](CXLSwitch *node) {
+    std::function<void(LegoMemSwitch *)> dfs_calculate = [&](LegoMemSwitch *node) {
         // 处理当前节点的expanders
         for (auto *expander : node->expanders) {
             total_latency += get_endpoint_rob_latency(expander, all_access, t_info, dramlatency);
@@ -382,7 +382,7 @@ int CXLController::insert(uint64_t timestamp, uint64_t tid, lbr lbrs[32], cntr c
     return 0;
 }
 
-std::vector<std::string> CXLController::tokenize(const std::string_view &s) {
+std::vector<std::string> LegoMemController::tokenize(const std::string_view &s) {
     std::vector<std::string> res;
     std::string tmp;
     for (char c : s) {
@@ -400,15 +400,15 @@ std::vector<std::string> CXLController::tokenize(const std::string_view &s) {
     }
     return res;
 }
-std::vector<std::tuple<uint64_t, uint64_t>> CXLController::get_access(uint64_t timestamp) {
-    return CXLSwitch::get_access(timestamp);
+std::vector<std::tuple<uint64_t, uint64_t>> LegoMemController::get_access(uint64_t timestamp) {
+    return LegoMemSwitch::get_access(timestamp);
 }
-std::tuple<double, std::vector<uint64_t>> CXLController::calculate_congestion() {
-    return CXLSwitch::calculate_congestion();
+std::tuple<double, std::vector<uint64_t>> LegoMemController::calculate_congestion() {
+    return LegoMemSwitch::calculate_congestion();
 }
-void CXLController::set_epoch(int epoch) { CXLSwitch::set_epoch(epoch); }
-// 在CXLController类中添加
-void CXLController::perform_back_invalidation() {
+void LegoMemController::set_epoch(int epoch) { LegoMemSwitch::set_epoch(epoch); }
+// 在LegoMemController类中添加
+void LegoMemController::perform_back_invalidation() {
     if (!caching_policy)
         return;
 
@@ -426,7 +426,7 @@ void CXLController::perform_back_invalidation() {
 }
 
 // 递归地处理所有扩展器中的失效
-void CXLController::invalidate_in_expanders(uint64_t addr) {
+void LegoMemController::invalidate_in_expanders(uint64_t addr) {
     // 处理当前控制器直接连接的扩展器
     for (auto expander : expanders) {
         if (expander) {
@@ -449,7 +449,7 @@ void CXLController::invalidate_in_expanders(uint64_t addr) {
 }
 
 // 在交换机及其子节点中执行失效
-void CXLController::invalidate_in_switch(CXLSwitch *switch_, uint64_t addr) {
+void LegoMemController::invalidate_in_switch(LegoMemSwitch *switch_, uint64_t addr) {
     if (!switch_)
         return;
 
@@ -478,18 +478,18 @@ void CXLController::invalidate_in_switch(CXLSwitch *switch_, uint64_t addr) {
  * LogP Queuing Model Integration
  *
  * Integrates the LogP model into the controller's latency calculation
- * for distributed/multi-node CXL topologies. The LogP parameters model
- * the inter-node communication cost which is added to the base CXL
+ * for distributed/multi-node LegoMem topologies. The LogP parameters model
+ * the inter-node communication cost which is added to the base LegoMem
  * device access latency.
  * ============================================================================ */
 
-void CXLController::configure_logp(const LogPConfig& config) {
+void LegoMemController::configure_logp(const LogPConfig& config) {
     logp_model.reconfigure(config);
-    SPDLOG_INFO("CXLController LogP configured: L={:.1f}ns o_s={:.1f}ns o_r={:.1f}ns g={:.1f}ns P={}",
+    SPDLOG_INFO("LegoMemController LogP configured: L={:.1f}ns o_s={:.1f}ns o_r={:.1f}ns g={:.1f}ns P={}",
                 config.L, config.o_s, config.o_r, config.g, config.P);
 }
 
-void CXLController::calibrate_logp_from_tcp(const struct TCPCalibrationResult& result) {
+void LegoMemController::calibrate_logp_from_tcp(const struct TCPCalibrationResult& result) {
     if (!result.valid) {
         SPDLOG_WARN("Invalid TCP calibration result, keeping existing LogP config");
         return;
@@ -511,19 +511,19 @@ void CXLController::calibrate_logp_from_tcp(const struct TCPCalibrationResult& r
     );
 
     logp_model.reconfigure(calibrated_config);
-    SPDLOG_INFO("CXLController LogP calibrated from TCP ({} samples): "
+    SPDLOG_INFO("LegoMemController LogP calibrated from TCP ({} samples): "
                 "L={:.1f}ns o_s={:.1f}ns o_r={:.1f}ns g={:.1f}ns",
                 result.samples,
                 calibrated_config.L, calibrated_config.o_s,
                 calibrated_config.o_r, calibrated_config.g);
 }
 
-double CXLController::calculate_logp_latency(uint32_t src_node, uint32_t dst_node, uint64_t timestamp) {
+double LegoMemController::calculate_logp_latency(uint32_t src_node, uint32_t dst_node, uint64_t timestamp) {
     if (src_node == dst_node) return 0.0;
     return logp_model.message_latency(timestamp, dst_node);
 }
 
-double CXLController::calculate_logp_broadcast_latency() {
+double LegoMemController::calculate_logp_broadcast_latency() {
     return logp_model.broadcast_latency();
 }
 
@@ -541,7 +541,7 @@ double CXLController::calculate_logp_broadcast_latency() {
  *   - Memory pooling with per-head capacity quotas
  * ============================================================================ */
 
-void CXLController::enable_mhsld(uint32_t num_heads, double bandwidth_gbps) {
+void LegoMemController::enable_mhsld(uint32_t num_heads, double bandwidth_gbps) {
     // Compute total capacity across all expanders
     uint64_t total_bytes = 0;
     for (auto* exp : cur_expanders) {
@@ -562,22 +562,22 @@ void CXLController::enable_mhsld(uint32_t num_heads, double bandwidth_gbps) {
                 num_heads, total_bytes / (1024 * 1024), bandwidth_gbps);
 }
 
-double CXLController::mhsld_read(uint32_t head_id, uint64_t addr, uint64_t timestamp) {
+double LegoMemController::mhsld_read(uint32_t head_id, uint64_t addr, uint64_t timestamp) {
     if (!mhsld_device) return 0.0;
     return mhsld_device->read_with_coherency(head_id, addr, timestamp);
 }
 
-double CXLController::mhsld_write(uint32_t head_id, uint64_t addr, uint64_t timestamp) {
+double LegoMemController::mhsld_write(uint32_t head_id, uint64_t addr, uint64_t timestamp) {
     if (!mhsld_device) return 0.0;
     return mhsld_device->write_with_coherency(head_id, addr, timestamp);
 }
 
-double CXLController::mhsld_atomic(uint32_t head_id, uint64_t addr, uint64_t timestamp) {
+double LegoMemController::mhsld_atomic(uint32_t head_id, uint64_t addr, uint64_t timestamp) {
     if (!mhsld_device) return 0.0;
     return mhsld_device->atomic_with_coherency(head_id, addr, timestamp);
 }
 
-MHSLDDevice::Stats CXLController::get_mhsld_stats() const {
+MHSLDDevice::Stats LegoMemController::get_mhsld_stats() const {
     if (!mhsld_device) {
         return {0, 0, 0, 0, 0.0, 0.0, 0.0};
     }
@@ -588,27 +588,27 @@ MHSLDDevice::Stats CXLController::get_mhsld_stats() const {
  * Distributed Topology Configuration
  *
  * Configures the controller for distributed multi-node operation with
- * HDM decoder for address routing and unified CoherencyEngine.
+ * Region decoder for address routing and unified CoherencyEngine.
  * ============================================================================ */
 
-void CXLController::configure_distributed(uint32_t local_node_id, HDMDecoderMode mode) {
+void LegoMemController::configure_distributed(uint32_t local_node_id, RegionDecoderMode mode) {
     local_node_id_ = local_node_id;
-    hdm_decoder_ = std::make_unique<HDMDecoder>(mode);
+    region_decoder_ = std::make_unique<RegionDecoder>(mode);
     coherency_ = std::make_unique<CoherencyEngine>(
-        local_node_id, hdm_decoder_.get(), &logp_model);
+        local_node_id, region_decoder_.get(), &logp_model);
 
-    SPDLOG_INFO("CXLController configured for distributed mode: node={}, mode={}",
+    SPDLOG_INFO("LegoMemController configured for distributed mode: node={}, mode={}",
                 local_node_id, static_cast<int>(mode));
 }
 
-RemoteCXLExpander* CXLController::add_remote_endpoint(uint32_t remote_node, uint64_t base,
+RemoteLegoMemEndpoint* LegoMemController::add_remote_endpoint(uint32_t remote_node, uint64_t base,
                                                        uint64_t capacity, const FabricLinkConfig& link_cfg) {
     int remote_id = num_end_points++;
 
-    auto* remote = new RemoteCXLExpander(remote_id, remote_node, local_node_id_,
+    auto* remote = new RemoteLegoMemEndpoint(remote_id, remote_node, local_node_id_,
                                          base, capacity, link_cfg);
     remote->coherency_engine_ = coherency_.get();
-    remote->hdm_decoder_ = hdm_decoder_.get();
+    remote->region_decoder_ = region_decoder_.get();
 
     // Add to topology
     this->expanders.push_back(remote);
@@ -621,7 +621,7 @@ RemoteCXLExpander* CXLController::add_remote_endpoint(uint32_t remote_node, uint
     return remote;
 }
 
-RemoteCXLExpander* CXLController::get_remote_expander(uint32_t node_id) {
+RemoteLegoMemEndpoint* LegoMemController::get_remote_expander(uint32_t node_id) {
     for (auto* remote : remote_expanders_) {
         if (remote->remote_node_id_ == node_id) {
             return remote;
@@ -632,19 +632,19 @@ RemoteCXLExpander* CXLController::get_remote_expander(uint32_t node_id) {
 
 /*
  * Calculate distributed latency combining:
- *   1. Base CXL device access latency (from endpoint tree traversal)
+ *   1. Base LegoMem device access latency (from endpoint tree traversal)
  *   2. LogP network latency (if remote node access)
  *   3. MH-SLD coherency overhead (if multi-headed sharing active)
  *
  * This is the main entry point for latency calculation in distributed mode.
  */
-double CXLController::calculate_distributed_latency(
+double LegoMemController::calculate_distributed_latency(
     const std::vector<std::tuple<uint64_t, uint64_t>> &elem,
     uint32_t head_id, uint32_t target_node) {
 
     if (elem.empty()) return 0.0;
 
-    // 1. Base CXL device latency from tree traversal
+    // 1. Base LegoMem device latency from tree traversal
     double base_latency = calculate_latency(elem, dramlatency);
 
     // 2. LogP network latency for remote access

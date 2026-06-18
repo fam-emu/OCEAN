@@ -102,7 +102,7 @@ public:
     };
 
     static Mode get_transport_mode() {
-        const char* mode = std::getenv("CXL_TRANSPORT_MODE");
+        const char* mode = std::getenv("LegoMem_TRANSPORT_MODE");
         if (mode) {
             if (std::string(mode) == "tcp") return MODE_TCP;
             if (std::string(mode) == "shm") return MODE_SHM;

@@ -1,5 +1,5 @@
 /*
- * Shared Memory Communication Implementation for CXLMemSim
+ * Shared Memory Communication Implementation for LegoMem
  * 
  * SPDX-License-Identifier: (LGPL-2.1 OR BSD-2-Clause)
  */
@@ -30,7 +30,7 @@ bool ShmCommunicationManager::initialize() {
         
         // Initialize the shared memory structure
         // Use shorter semaphore names to avoid POSIX limits
-        std::string sem_prefix = "/cxlsim";
+        std::string sem_prefix = "/legomemsim";
         shm_comm->initialize(sem_prefix);
         
         if (!setup_semaphores()) {

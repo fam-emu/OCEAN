@@ -1,5 +1,5 @@
 /*
- * CXLMemSim pebs
+ * LegoMem pebs
  *
  *  By: Andrew Quinn
  *      Yiwei Yang
@@ -9,12 +9,12 @@
  *  UC Santa Cruz Sluglab.
  */
 
-#ifndef CXLMEMSIM_PEBS_H
-#define CXLMEMSIM_PEBS_H
+#ifndef LEGOMEM_PEBS_H
+#define LEGOMEM_PEBS_H
 
 #include "helper.h"
 #include <cstdint>
-#include <cxlcontroller.h>
+#include <legomemcontroller.h>
 #include <sys/mman.h>
 #include <sys/types.h>
 
@@ -29,9 +29,9 @@ public:
     perf_event_mmap_page *mp;
     PEBS(pid_t, uint64_t);
     ~PEBS();
-    int read(CXLController *, PEBSElem *);
+    int read(LegoMemController *, PEBSElem *);
     int start() const;
     int stop() const;
 };
 
-#endif // CXLMEMSIM_PEBS_H
+#endif // LEGOMEM_PEBS_H

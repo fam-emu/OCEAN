@@ -1,5 +1,5 @@
 /*
- * CXLMemSim incore
+ * LegoMem incore
  *
  *  By: Andrew Quinn
  *      Yiwei Yang
@@ -9,14 +9,14 @@
  *  UC Santa Cruz Sluglab.
  */
 
-#ifndef CXLMEMSIM_INCORE_H
-#define CXLMEMSIM_INCORE_H
+#ifndef LEGOMEM_INCORE_H
+#define LEGOMEM_INCORE_H
 #include "helper.h"
 #include "perf.h"
 #include <array>
 #include <cstdint>
 
-class CXLController;
+class LegoMemController;
 union CPUID_INFO {
     int array[4];
     struct {
@@ -39,4 +39,4 @@ public:
 void pcm_cpuid(unsigned leaf, CPUID_INFO *info);
 bool get_cpu_info(struct CPUInfo *);
 
-#endif // CXLMEMSIM_INCORE_H
+#endif // LEGOMEM_INCORE_H

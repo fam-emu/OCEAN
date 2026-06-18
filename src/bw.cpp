@@ -1,5 +1,5 @@
 /*
- * CXLMemSim bandwidth test
+ * LegoMem bandwidth test
  *
  *  By: Andrew Quinn
  *      Yiwei Yang

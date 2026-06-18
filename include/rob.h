@@ -1,5 +1,5 @@
 /*
- * CXLMemSim rob
+ * LegoMem rob
  *
  *  By: Andrew Quinn
  *      Yiwei Yang
@@ -9,10 +9,10 @@
  *  UC Santa Cruz Sluglab.
  */
 
-#ifndef CXLMEMSIM_ROB_H
-#define CXLMEMSIM_ROB_H
+#ifndef LEGOMEM_ROB_H
+#define LEGOMEM_ROB_H
 
-#include "cxlcontroller.h"
+#include "legomemcontroller.h"
 #include <deque>
 
 // Structure holding the minimal info we want.
@@ -26,11 +26,11 @@ struct InstructionGroup {
 
 class Rob {
 public:
-    explicit Rob(CXLController *controller, size_t size = 256, uint64_t cycle = 1687)
+    explicit Rob(LegoMemController *controller, size_t size = 256, uint64_t cycle = 1687)
         : controller_(controller), maxSize_(size), currentCycle_(cycle) {}
 
     // 基本属性
-    CXLController *controller_;
+    LegoMemController *controller_;
     const size_t maxSize_;
     std::deque<InstructionGroup> queue_; // ROB队列
     int64_t stallCount_ = 0; // 停顿计数
@@ -64,4 +64,4 @@ public:
     }
 };
 
-#endif // CXLMEMSIM_ROB_H
+#endif // LEGOMEM_ROB_H

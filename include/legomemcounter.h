@@ -1,5 +1,5 @@
 /*
- * CXLMemSim counter
+ * LegoMem counter
  *
  *  By: Andrew Quinn
  *      Yiwei Yang
@@ -8,8 +8,8 @@
  *  Copyright 2025 Regents of the University of California
  *  UC Santa Cruz Sluglab.
  */
-#ifndef CXLMEMSIM_CXLCOUNTER_H
-#define CXLMEMSIM_CXLCOUNTER_H
+#ifndef LEGOMEM_COUNTER_H
+#define LEGOMEM_COUNTER_H
 
 #include <atomic>
 #include <concepts>
@@ -90,13 +90,13 @@ inline constexpr bool implements_counter_concept = requires(AtomicCounter<Name> 
 enum class EventType { Load, Store, Conflict, MigrateIn, MigrateOut, HitOld, Local, Remote, Hitm };
 
 // 开关事件计数器 (Switch event counter)
-class CXLSwitchEvent {
+class LegoMemSwitchEvent {
 public:
     AtomicCounter<loadName> load;
     AtomicCounter<storeName> store;
     AtomicCounter<conflictName> conflict;
 
-    constexpr CXLSwitchEvent() noexcept = default;
+    constexpr LegoMemSwitchEvent() noexcept = default;
 
     // 使用C++20的模板元编程和编译期字符串实现更灵活的接口 (Use C++20 template metaprogramming and compile-time strings
     // to implement more flexible interfaces)
@@ -116,18 +116,18 @@ public:
 
     // 使用C++23的auto模板参数实现更灵活的统计功能
     template <auto Field> constexpr uint64_t get() const noexcept {
-        if constexpr (Field == &CXLSwitchEvent::load) {
+        if constexpr (Field == &LegoMemSwitchEvent::load) {
             return load;
-        } else if constexpr (Field == &CXLSwitchEvent::store) {
+        } else if constexpr (Field == &LegoMemSwitchEvent::store) {
             return store;
-        } else if constexpr (Field == &CXLSwitchEvent::conflict) {
+        } else if constexpr (Field == &LegoMemSwitchEvent::conflict) {
             return conflict;
         }
     }
 };
 
 // 内存扩展器事件计数器
-class CXLMemExpanderEvent {
+class LegoMemMemoryEndpointEvent {
 public:
     AtomicCounter<loadName> load;
     AtomicCounter<storeName> store;
@@ -135,7 +135,7 @@ public:
     AtomicCounter<migrateOutName> migrate_out;
     AtomicCounter<hitOldName> hit_old;
 
-    constexpr CXLMemExpanderEvent() noexcept = default;
+    constexpr LegoMemMemoryEndpointEvent() noexcept = default;
 
     template <EventType Type> constexpr void increment() noexcept {
         if constexpr (Type == EventType::Load) {
@@ -180,14 +180,14 @@ public:
 };
 
 // 通用计数器
-class CXLCounter {
+class LegoMemCounter {
 public:
     AtomicCounter<localName> local;
     AtomicCounter<remoteName> remote;
     AtomicCounter<hitmName> hitm;
     AtomicCounter<backinvName> backinv;
 
-    constexpr CXLCounter() noexcept = default;
+    constexpr LegoMemCounter() noexcept = default;
 
     template <EventType Type> constexpr void increment() noexcept {
         if constexpr (Type == EventType::Local) {
@@ -211,12 +211,12 @@ public:
     }
 };
 
-class CXLPageTableEvent {
+class LegoMemPageTableEvent {
 public:
     AtomicCounter<hitName> hit;
     AtomicCounter<missName> miss;
     AtomicCounter<totalName> total;
-    constexpr CXLPageTableEvent() noexcept = default;
+    constexpr LegoMemPageTableEvent() noexcept = default;
 
     constexpr void inc_hit() noexcept { hit.increment(); }
     constexpr void inc_miss() noexcept { miss.increment(); }
@@ -232,7 +232,7 @@ public:
     }
 };
 
-class CXLHugePageEvent {
+class LegoMemHugePageEvent {
 public:
     AtomicCounter<tlbhits4kName> tlb_hits_4k;
     AtomicCounter<tlbmisses4kName> tlb_misses_4k;
@@ -241,7 +241,7 @@ public:
     AtomicCounter<tlbhits1gName> tlb_hits_1g;
     AtomicCounter<tlbmisses1gName> tlb_misses_1g;
     AtomicCounter<ptwcountName> ptw_count; // 页表遍历次数
-    constexpr CXLHugePageEvent() noexcept = default;
+    constexpr LegoMemHugePageEvent() noexcept = default;
     constexpr void inc_tlb_hits_4k() noexcept { tlb_hits_4k.increment(); }
     constexpr void inc_tlb_misses_4k() noexcept { tlb_misses_4k.increment(); }
     constexpr void inc_tlb_hits_2m() noexcept { tlb_hits_2m.increment(); }
@@ -259,4 +259,4 @@ public:
     constexpr uint64_t get_ptw_count() const noexcept { return ptw_count; }
 };
 
-#endif // CXLMEMSIM_CXLCOUNTER_H
+#endif // LEGOMEM_COUNTER_H

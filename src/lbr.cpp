@@ -1,5 +1,5 @@
 /*
- * CXLMemSim lbr
+ * LegoMem lbr
  *
  *  By: Andrew Quinn
  *      Yiwei Yang
@@ -133,7 +133,7 @@ LBR::LBR(pid_t pid, uint64_t sample_period) : pid(pid), sample_period(sample_per
     }
 }
 
-int LBR::read(CXLController *controller, LBRElem *elem) {
+int LBR::read(LegoMemController *controller, LBRElem *elem) {
     if (this->fd < 0) {
         return -1;
     }

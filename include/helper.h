@@ -1,5 +1,5 @@
 /*
- * CXLMemSim helper
+ * LegoMem helper
  *
  *  By: Andrew Quinn
  *      Yiwei Yang
@@ -9,8 +9,8 @@
  *  UC Santa Cruz Sluglab.
  */
 
-#ifndef CXLMEMSIM_HELPER_H
-#define CXLMEMSIM_HELPER_H
+#ifndef LEGOMEM_HELPER_H
+#define LEGOMEM_HELPER_H
 
 #include "incore.h"
 #include "uncore.h"
@@ -55,12 +55,12 @@ struct ModelContext {
     PerfConfig perf_conf;
 };
 
-struct EmuCXLLatency {
+struct EmuLegoMemLatency {
     double read;
     double write;
 };
 
-struct EmuCXLBandwidth {
+struct EmuLegoMemBandwidth {
     double read;
     double write;
 };
@@ -134,4 +134,4 @@ public:
 
 long perf_event_open(perf_event_attr *event_attr, pid_t pid, int cpu, int group_fd, unsigned long flags);
 
-#endif // CXLMEMSIM_HELPER_H
+#endif // LEGOMEM_HELPER_H

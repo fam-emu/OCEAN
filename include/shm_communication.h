@@ -1,5 +1,5 @@
 /*
- * Shared Memory Communication Interface for CXLMemSim
+ * Shared Memory Communication Interface for LegoMem
  * Provides IPC via /dev/shm as an alternative to TCP sockets
  * 
  * SPDX-License-Identifier: (LGPL-2.1 OR BSD-2-Clause)
@@ -203,7 +203,7 @@ private:
     
 public:
     ShmAutoCleanup(const std::string& name) : shm_name(name) {
-        sem_prefix = "/cxlmemsim_" + name;
+        sem_prefix = "/legomem_" + name;
     }
     
     ~ShmAutoCleanup() {

@@ -1,5 +1,5 @@
 /*
- * CXLMemSim rob file
+ * LegoMem rob file
  *
  *  By: Andrew Quinn
  *      Yiwei Yang
@@ -26,7 +26,7 @@
 #include <vector>
 
 Helper helper{};
-CXLController *controller;
+LegoMemController *controller;
 Monitors *monitors;
 
 // Simple trim function to remove leading/trailing whitespace.
@@ -290,14 +290,14 @@ void generateDelayedTrace(const std::vector<InstructionGroup> &instructions, Rob
 
 int main(int argc, char *argv[]) {
     spdlog::cfg::load_env_levels();
-    cxxopts::Options options("CXLMemSim", "For simulation of CXL.mem Type 3 on Xeon 6");
+    cxxopts::Options options("LegoMem", "For simulation of LegoMem.mem Type 3 on Xeon 6");
     options.add_options()("t,target", "The script file to execute",
                           cxxopts::value<std::string>()->default_value("/trace.out"))(
-        "h,help", "Help for CXLMemSimRoB", cxxopts::value<bool>()->default_value("false"))(
-        "o,topology", "The newick tree input for the CXL memory expander topology",
+        "h,help", "Help for LegoMemRoB", cxxopts::value<bool>()->default_value("false"))(
+        "o,topology", "The newick tree input for the LegoMem memory expander topology",
         cxxopts::value<std::string>()->default_value("(1,(2,3))"))(
         "d,dramlatency", "The current platform's dram latency", cxxopts::value<double>()->default_value("110"))(
-        "e,capacity", "The capacity vector of the CXL memory expander with the first local",
+        "e,capacity", "The capacity vector of the LegoMem memory expander with the first local",
         cxxopts::value<std::vector<int>>()->default_value("0,20,20,20"))(
         "m,mode", "Page mode or cacheline mode", cxxopts::value<std::string>()->default_value("cacheline"))(
         "f,frequency", "The frequency for the running thread", cxxopts::value<double>()->default_value("4000"))(
@@ -340,7 +340,7 @@ int main(int argc, char *argv[]) {
     for (size_t idx = 0; idx < capacity.size(); idx++) {
         if (idx == 0) {
             SPDLOG_DEBUG("local_memory_region capacity:{}", capacity[idx]);
-            controller = new CXLController({policy1, policy2, policy3, policy4}, capacity[0], mode, 100, dramlatency);
+            controller = new LegoMemController({policy1, policy2, policy3, policy4}, capacity[0], mode, 100, dramlatency);
         } else {
             SPDLOG_DEBUG("memory_region:{}", (idx - 1) + 1);
             SPDLOG_DEBUG(" capacity:{}", capacity[(idx - 1) + 1]);
@@ -348,7 +348,7 @@ int main(int argc, char *argv[]) {
             SPDLOG_DEBUG(" write_latency:{}", latency[(idx - 1) * 2 + 1]);
             SPDLOG_DEBUG(" read_bandwidth:{}", bandwidth[(idx - 1) * 2]);
             SPDLOG_DEBUG(" write_bandwidth:{}", bandwidth[(idx - 1) * 2 + 1]);
-            auto *ep = new CXLMemExpander(bandwidth[(idx - 1) * 2], bandwidth[(idx - 1) * 2 + 1],
+            auto *ep = new LegoMemMemoryEndpoint(bandwidth[(idx - 1) * 2], bandwidth[(idx - 1) * 2 + 1],
                                           latency[(idx - 1) * 2], latency[(idx - 1) * 2 + 1], (idx - 1), capacity[idx]);
             controller->insert_end_point(ep);
         }

@@ -1,5 +1,5 @@
 /*
- * CXLMemSim incore
+ * LegoMem incore
  *
  *  By: Andrew Quinn
  *      Yiwei Yang

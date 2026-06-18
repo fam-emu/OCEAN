@@ -1,5 +1,5 @@
 /*
- * CXLMemSim main
+ * LegoMem main
  *
  *  By: Andrew Quinn
  *      Yiwei Yang
@@ -9,7 +9,7 @@
  *  UC Santa Cruz Sluglab.
  */
 #define SPDLOG_ACTIVE_LEVEL SPDLOG_LEVEL_OFF
-#include "cxlendpoint.h"
+#include "legomemendpoint.h"
 #include "helper.h"
 #include "monitor.h"
 #include "policy.h"
@@ -26,23 +26,23 @@
 #include <sys/un.h>
 #include <unistd.h>
 Helper helper{};
-CXLController *controller;
+LegoMemController *controller;
 Monitors *monitors;
 auto cha_mapping = std::vector{0, 1, 2, 3, 4, 5, 6, 7, 8};
 int main(int argc, char *argv[]) {
     spdlog::cfg::load_env_levels();
-    cxxopts::Options options("CXLMemSim", "For simulation of CXL.mem Type 3 on Xeon 6");
+    cxxopts::Options options("LegoMem", "For simulation of LegoMem.mem Type 3 on Xeon 6");
     options.add_options()("t,target", "The script file to execute",
                           cxxopts::value<std::string>()->default_value("./microbench/malloc"))(
-        "h,help", "Help for CXLMemSim", cxxopts::value<bool>()->default_value("false"))(
+        "h,help", "Help for LegoMem", cxxopts::value<bool>()->default_value("false"))(
         "c,cpuset", "The CPUSET for CPU to set affinity on and only run the target process on those CPUs",
         cxxopts::value<std::vector<int>>()->default_value("0,1,2,3"))(
         "d,dramlatency", "The current platform's dram latency", cxxopts::value<double>()->default_value("110"))(
         "p,pebsperiod", "The pebs sample period", cxxopts::value<int>()->default_value("10"))(
         "m,mode", "Page mode or cacheline mode", cxxopts::value<std::string>()->default_value("p"))(
-        "o,topology", "The newick tree input for the CXL memory expander topology",
+        "o,topology", "The newick tree input for the LegoMem memory expander topology",
         cxxopts::value<std::string>()->default_value("(1,(2,3))"))(
-        "q,capacity", "The capacity vector of the CXL memory expander with the first local",
+        "q,capacity", "The capacity vector of the LegoMem memory expander with the first local",
         cxxopts::value<std::vector<int>>()->default_value("0,20,20,20"))(
         "f,frequency", "The frequency for the running thread", cxxopts::value<double>()->default_value("4000"))(
         "l,latency", "The simulated latency by epoch based calculation for injected latency",
@@ -61,9 +61,9 @@ int main(int argc, char *argv[]) {
         cxxopts::value<std::vector<double>>()->default_value("88, 88, 88, 88, 88, 88, 88"))(
         "v,weight_vec", "The weight vector for Linear Regression",
         cxxopts::value<std::vector<double>>()->default_value("400, 800, 1200, 1600, 2000, 2400, 3000"))(
-        "k,policy", "The policy of CXL memory controller",
+        "k,policy", "The policy of LegoMem memory controller",
         cxxopts::value<std::vector<std::string>>()->default_value("none,none,none,none"))(
-        "e,env", "The environment variable for the CXL memory controller",
+        "e,env", "The environment variable for the LegoMem memory controller",
         cxxopts::value<std::vector<std::string>>()->default_value("OMP_NUM_THREADS=24"));
     ;
 
@@ -183,7 +183,7 @@ int main(int argc, char *argv[]) {
     for (size_t idx = 0; idx < capacity.size(); idx++) {
         if (idx == 0) {
             SPDLOG_DEBUG("local_memory_region capacity:{}", capacity[idx]);
-            controller = new CXLController({policy1, policy2, policy3, policy4}, capacity[0], mode, 100, dramlatency);
+            controller = new LegoMemController({policy1, policy2, policy3, policy4}, capacity[0], mode, 100, dramlatency);
         } else {
             SPDLOG_DEBUG("memory_region:{}", (idx - 1) + 1);
             SPDLOG_DEBUG(" capacity:{}", capacity[(idx - 1) + 1]);
@@ -191,7 +191,7 @@ int main(int argc, char *argv[]) {
             SPDLOG_DEBUG(" write_latency:{}", latency[(idx - 1) * 2 + 1]);
             SPDLOG_DEBUG(" read_bandwidth:{}", bandwidth[(idx - 1) * 2]);
             SPDLOG_DEBUG(" write_bandwidth:{}", bandwidth[(idx - 1) * 2 + 1]);
-            auto *ep = new CXLMemExpander(bandwidth[(idx - 1) * 2], bandwidth[(idx - 1) * 2 + 1],
+            auto *ep = new LegoMemMemoryEndpoint(bandwidth[(idx - 1) * 2], bandwidth[(idx - 1) * 2 + 1],
                                           latency[(idx - 1) * 2], latency[(idx - 1) * 2 + 1], idx - 1, capacity[idx]);
             controller->insert_end_point(ep);
         }
@@ -252,7 +252,7 @@ int main(int argc, char *argv[]) {
         SPDLOG_DEBUG("pid({}) not found. might be already terminated.", t_process);
     }
     cur_processes++;
-    SPDLOG_DEBUG("pid of CXLMemSim = {}, cur process={}", t_process, cur_processes);
+    SPDLOG_DEBUG("pid of LegoMem = {}, cur process={}", t_process, cur_processes);
 
     if (cur_processes >= ncpu) {
         SPDLOG_ERROR("Failed to execute. The number of processes/threads of the target application is more than "

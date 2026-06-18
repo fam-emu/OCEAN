@@ -1,14 +1,14 @@
 /*
- * CXL Backend Abstraction Interface
- * Provides a unified interface for different CXL memory backends:
- *   - SHMEM: Shared memory communication with CXLMemSim server
- *   - DAX: Direct access to CXL memory via /dev/dax devices
+ * LegoMem Backend Abstraction Interface
+ * Provides a unified interface for different LegoMem memory backends:
+ *   - SHMEM: Shared memory communication with LegoMem server
+ *   - DAX: Direct access to LegoMem memory via /dev/dax devices
  *
  * SPDX-License-Identifier: (LGPL-2.1 OR BSD-2-Clause)
  */
 
-#ifndef CXL_BACKEND_H
-#define CXL_BACKEND_H
+#ifndef LegoMem_BACKEND_H
+#define LegoMem_BACKEND_H
 
 #include <stdint.h>
 #include <stddef.h>
@@ -20,19 +20,19 @@ extern "C" {
 
 /* Backend types */
 typedef enum {
-    CXL_BACKEND_NONE = 0,
-    CXL_BACKEND_TCP = 1,       /* Original TCP-based CXLMemSim */
-    CXL_BACKEND_SHMEM = 2,     /* Shared memory with CXLMemSim server */
-    CXL_BACKEND_DAX = 3        /* Direct /dev/dax access */
-} cxl_backend_type_t;
+    LegoMem_BACKEND_NONE = 0,
+    LegoMem_BACKEND_TCP = 1,       /* Original TCP-based LegoMem */
+    LegoMem_BACKEND_SHMEM = 2,     /* Shared memory with LegoMem server */
+    LegoMem_BACKEND_DAX = 3        /* Direct /dev/dax access */
+} legomem_backend_type_t;
 
 /* Forward declarations */
-typedef struct cxl_backend cxl_backend_t;
-typedef struct cxl_backend_ops cxl_backend_ops_t;
+typedef struct legomem_backend legomem_backend_t;
+typedef struct legomem_backend_ops legomem_backend_ops_t;
 
 /* Backend configuration */
 typedef struct {
-    cxl_backend_type_t type;
+    legomem_backend_type_t type;
 
     union {
         /* TCP backend config */
@@ -43,7 +43,7 @@ typedef struct {
 
         /* Shared memory backend config */
         struct {
-            char shm_name[256];      /* POSIX shared memory name (e.g., "/cxlmemsim") */
+            char shm_name[256];      /* POSIX shared memory name (e.g., "/legomem") */
             size_t shm_size;         /* Size of shared memory region */
             bool is_server;          /* True if this is the server side */
         } shmem;
@@ -55,7 +55,7 @@ typedef struct {
             size_t region_size;      /* Size of region to map */
         } dax;
     };
-} cxl_backend_config_t;
+} legomem_backend_config_t;
 
 /* Statistics common to all backends */
 typedef struct {
@@ -65,64 +65,64 @@ typedef struct {
     uint64_t bytes_written;
     uint64_t total_latency_ns;
     uint64_t avg_latency_ns;
-} cxl_backend_stats_t;
+} legomem_backend_stats_t;
 
 /* Backend operations interface */
-struct cxl_backend_ops {
+struct legomem_backend_ops {
     /* Initialize the backend with given config */
-    int (*init)(cxl_backend_t* backend, const cxl_backend_config_t* config);
+    int (*init)(legomem_backend_t* backend, const legomem_backend_config_t* config);
 
     /* Connect/open the backend */
-    int (*connect)(cxl_backend_t* backend);
+    int (*connect)(legomem_backend_t* backend);
 
     /* Disconnect/close the backend */
-    void (*disconnect)(cxl_backend_t* backend);
+    void (*disconnect)(legomem_backend_t* backend);
 
     /* Cleanup and free resources */
-    void (*finalize)(cxl_backend_t* backend);
+    void (*finalize)(legomem_backend_t* backend);
 
     /* Check if backend is ready */
-    bool (*is_ready)(cxl_backend_t* backend);
+    bool (*is_ready)(legomem_backend_t* backend);
 
-    /* Read from remote/CXL memory */
-    int (*read)(cxl_backend_t* backend, uint64_t addr, void* data,
+    /* Read from remote/LegoMem memory */
+    int (*read)(legomem_backend_t* backend, uint64_t addr, void* data,
                 size_t size, uint64_t* latency_ns);
 
-    /* Write to remote/CXL memory */
-    int (*write)(cxl_backend_t* backend, uint64_t addr, const void* data,
+    /* Write to remote/LegoMem memory */
+    int (*write)(legomem_backend_t* backend, uint64_t addr, const void* data,
                  size_t size, uint64_t* latency_ns);
 
     /* Bulk read (multi-cacheline) */
-    int (*bulk_read)(cxl_backend_t* backend, uint64_t addr, void* data, size_t size);
+    int (*bulk_read)(legomem_backend_t* backend, uint64_t addr, void* data, size_t size);
 
     /* Bulk write (multi-cacheline) */
-    int (*bulk_write)(cxl_backend_t* backend, uint64_t addr, const void* data, size_t size);
+    int (*bulk_write)(legomem_backend_t* backend, uint64_t addr, const void* data, size_t size);
 
     /* Atomic fetch-and-add */
-    int (*atomic_faa)(cxl_backend_t* backend, uint64_t addr,
+    int (*atomic_faa)(legomem_backend_t* backend, uint64_t addr,
                       uint64_t value, uint64_t* old_value);
 
     /* Atomic compare-and-swap */
-    int (*atomic_cas)(cxl_backend_t* backend, uint64_t addr,
+    int (*atomic_cas)(legomem_backend_t* backend, uint64_t addr,
                       uint64_t expected, uint64_t desired, uint64_t* old_value);
 
     /* Memory fence */
-    void (*fence)(cxl_backend_t* backend);
+    void (*fence)(legomem_backend_t* backend);
 
     /* Cache flush */
-    void (*flush)(cxl_backend_t* backend, uint64_t addr, size_t size);
+    void (*flush)(legomem_backend_t* backend, uint64_t addr, size_t size);
 
     /* Get statistics */
-    void (*get_stats)(cxl_backend_t* backend, cxl_backend_stats_t* stats);
+    void (*get_stats)(legomem_backend_t* backend, legomem_backend_stats_t* stats);
 
     /* Reset statistics */
-    void (*reset_stats)(cxl_backend_t* backend);
+    void (*reset_stats)(legomem_backend_t* backend);
 };
 
 /* Backend context structure */
-struct cxl_backend {
-    cxl_backend_type_t type;
-    const cxl_backend_ops_t* ops;
+struct legomem_backend {
+    legomem_backend_type_t type;
+    const legomem_backend_ops_t* ops;
     bool connected;
     void* priv;                      /* Backend-specific private data */
     void* lock;                      /* Thread safety (pthread_mutex_t*) */
@@ -145,80 +145,80 @@ struct cxl_backend {
  * @param config   Backend configuration
  * @return         Allocated backend or NULL on error
  */
-cxl_backend_t* cxl_backend_create(cxl_backend_type_t type,
-                                   const cxl_backend_config_t* config);
+legomem_backend_t* legomem_backend_create(legomem_backend_type_t type,
+                                   const legomem_backend_config_t* config);
 
 /**
  * Destroy a backend
  * @param backend  Backend to destroy
  */
-void cxl_backend_destroy(cxl_backend_t* backend);
+void legomem_backend_destroy(legomem_backend_t* backend);
 
 /**
  * Get backend type name as string
  * @param type     Backend type
  * @return         String name
  */
-const char* cxl_backend_type_name(cxl_backend_type_t type);
+const char* legomem_backend_type_name(legomem_backend_type_t type);
 
 /* ============================================================================
  * Convenience Macros
  * ============================================================================ */
 
-#define CXL_BACKEND_READ(b, addr, data, size, lat) \
+#define LegoMem_BACKEND_READ(b, addr, data, size, lat) \
     ((b)->ops->read((b), (addr), (data), (size), (lat)))
 
-#define CXL_BACKEND_WRITE(b, addr, data, size, lat) \
+#define LegoMem_BACKEND_WRITE(b, addr, data, size, lat) \
     ((b)->ops->write((b), (addr), (data), (size), (lat)))
 
-#define CXL_BACKEND_BULK_READ(b, addr, data, size) \
+#define LegoMem_BACKEND_BULK_READ(b, addr, data, size) \
     ((b)->ops->bulk_read((b), (addr), (data), (size)))
 
-#define CXL_BACKEND_BULK_WRITE(b, addr, data, size) \
+#define LegoMem_BACKEND_BULK_WRITE(b, addr, data, size) \
     ((b)->ops->bulk_write((b), (addr), (data), (size)))
 
-#define CXL_BACKEND_FENCE(b) \
+#define LegoMem_BACKEND_FENCE(b) \
     ((b)->ops->fence((b)))
 
-#define CXL_BACKEND_FLUSH(b, addr, size) \
+#define LegoMem_BACKEND_FLUSH(b, addr, size) \
     ((b)->ops->flush((b), (addr), (size)))
 
 /* ============================================================================
  * Shared Memory Protocol Structures (for SHMEM backend)
  * ============================================================================ */
 
-#define CXL_SHM_MAGIC 0x43584C53484D454D  /* "CXLSHMEM" */
-#define CXL_SHM_VERSION 1
-#define CXL_SHM_MAX_SLOTS 64
-#define CXL_SHM_CACHELINE_SIZE 64
+#define LEGOMEM_SHM_MAGIC 0x43584C53484D454D  /* "LegoMemSHMEM" */
+#define LEGOMEM_SHM_VERSION 1
+#define LEGOMEM_SHM_MAX_SLOTS 64
+#define LEGOMEM_SHM_CACHELINE_SIZE 64
 
 /* Request types */
-#define CXL_SHM_REQ_NONE          0
-#define CXL_SHM_REQ_READ          1
-#define CXL_SHM_REQ_WRITE         2
-#define CXL_SHM_REQ_ATOMIC_FAA    3
-#define CXL_SHM_REQ_ATOMIC_CAS    4
-#define CXL_SHM_REQ_FENCE         5
-#define CXL_SHM_REQ_READ_META     6   /* Read with metadata */
-#define CXL_SHM_REQ_WRITE_META    7   /* Write with metadata */
-#define CXL_SHM_REQ_GET_META      8   /* Get metadata only */
-#define CXL_SHM_REQ_SET_META      9   /* Set metadata only */
+#define LEGOMEM_SHM_REQ_NONE          0
+#define LEGOMEM_SHM_REQ_READ          1
+#define LEGOMEM_SHM_REQ_WRITE         2
+#define LEGOMEM_SHM_REQ_ATOMIC_FAA    3
+#define LEGOMEM_SHM_REQ_ATOMIC_CAS    4
+#define LEGOMEM_SHM_REQ_FENCE         5
+#define LEGOMEM_SHM_REQ_READ_META     6   /* Read with metadata */
+#define LEGOMEM_SHM_REQ_WRITE_META    7   /* Write with metadata */
+#define LEGOMEM_SHM_REQ_GET_META      8   /* Get metadata only */
+#define LEGOMEM_SHM_REQ_SET_META      9   /* Set metadata only */
 
 /* Response status */
-#define CXL_SHM_RESP_NONE     0
-#define CXL_SHM_RESP_OK       1
-#define CXL_SHM_RESP_ERROR    2
+#define LEGOMEM_SHM_RESP_NONE     0
+#define LEGOMEM_SHM_RESP_OK       1
+#define LEGOMEM_SHM_RESP_ERROR    2
 
 /* MESI Cache States */
-#define CXL_CACHE_INVALID     0
-#define CXL_CACHE_SHARED      1
-#define CXL_CACHE_EXCLUSIVE   2
-#define CXL_CACHE_MODIFIED    3
+#define LegoMem_CACHE_INVALID     0
+#define LegoMem_CACHE_SHARED      1
+#define LegoMem_CACHE_EXCLUSIVE   2
+#define LegoMem_CACHE_MODIFIED    3
 
 /* Metadata flags */
-#define CXL_META_FLAG_DIRTY   0x01
-#define CXL_META_FLAG_LOCKED  0x02
-#define CXL_META_FLAG_PINNED  0x04
+#define LegoMem_META_FLAG_DIRTY   0x01
+#define LegoMem_META_FLAG_LOCKED  0x02
+#define LegoMem_META_FLAG_PINNED  0x04
 
 /* Cacheline metadata structure (64 bytes) - compatible with Splash libpgas */
 typedef struct {
@@ -232,13 +232,13 @@ typedef struct {
     uint32_t version;           /* Version number for coherency */
     uint8_t flags;              /* Various flags (dirty, locked, etc.) */
     uint8_t reserved[23];       /* Reserved for future use */
-} __attribute__((packed)) cxl_cacheline_metadata_t;
+} __attribute__((packed)) legomem_cacheline_metadata_t;
 
 /* PGAS Memory Entry: 128 bytes (64 data + 64 metadata) per cacheline */
 typedef struct {
-    uint8_t data[CXL_SHM_CACHELINE_SIZE];  /* 64 bytes of data */
-    cxl_cacheline_metadata_t metadata;      /* 64 bytes of metadata */
-} __attribute__((packed, aligned(128))) cxl_pgas_entry_t;
+    uint8_t data[LEGOMEM_SHM_CACHELINE_SIZE];  /* 64 bytes of data */
+    legomem_cacheline_metadata_t metadata;      /* 64 bytes of metadata */
+} __attribute__((packed, aligned(128))) legomem_pgas_entry_t;
 
 /* Shared memory slot for request/response */
 typedef struct {
@@ -250,9 +250,9 @@ typedef struct {
     volatile uint64_t expected;      /* Expected value for CAS */
     volatile uint64_t latency_ns;    /* Simulated latency */
     volatile uint64_t timestamp;     /* Request timestamp */
-    uint8_t data[CXL_SHM_CACHELINE_SIZE];  /* Data buffer (64 bytes) */
-    cxl_cacheline_metadata_t metadata;     /* Metadata buffer (64 bytes) */
-} __attribute__((aligned(256))) cxl_shm_slot_t;
+    uint8_t data[LEGOMEM_SHM_CACHELINE_SIZE];  /* Data buffer (64 bytes) */
+    legomem_cacheline_metadata_t metadata;     /* Metadata buffer (64 bytes) */
+} __attribute__((aligned(256))) legomem_shm_slot_t;
 
 /* Shared memory header */
 typedef struct {
@@ -267,18 +267,18 @@ typedef struct {
     uint32_t metadata_enabled;       /* 1 if metadata transfer is enabled */
     uint32_t entry_size;             /* Size of each entry (64 or 128 bytes) */
     uint8_t padding[64 - 56];        /* Pad header to 64 bytes */
-    cxl_shm_slot_t slots[];          /* Request/response slots */
-} __attribute__((aligned(64))) cxl_shm_header_t;
+    legomem_shm_slot_t slots[];          /* Request/response slots */
+} __attribute__((aligned(64))) legomem_shm_header_t;
 
 /* Header flags */
-#define CXL_SHM_FLAG_METADATA_ENABLED  0x01
+#define LEGOMEM_SHM_FLAG_METADATA_ENABLED  0x01
 
 /* Size calculation */
-#define CXL_SHM_HEADER_SIZE(nslots) \
-    (sizeof(cxl_shm_header_t) + (nslots) * sizeof(cxl_shm_slot_t))
+#define LEGOMEM_SHM_HEADER_SIZE(nslots) \
+    (sizeof(legomem_shm_header_t) + (nslots) * sizeof(legomem_shm_slot_t))
 
 #ifdef __cplusplus
 }
 #endif
 
-#endif /* CXL_BACKEND_H */
+#endif /* LegoMem_BACKEND_H */

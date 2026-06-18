@@ -1,5 +1,5 @@
 /*
- * CXLMemSim perf
+ * LegoMem perf
  *
  *  By: Andrew Quinn
  *      Yiwei Yang

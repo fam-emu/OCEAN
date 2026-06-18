@@ -1,5 +1,5 @@
 /*
- * CXLMemSim policy
+ * LegoMem policy
  *
  *  By: Andrew Quinn
  *      Yiwei Yang
@@ -15,7 +15,7 @@ PagingPolicy::PagingPolicy() = default;
 CachingPolicy::CachingPolicy() = default;
 AllocationPolicy::AllocationPolicy() = default;
 // If the number is -1 for local, else it is the index of the remote server
-int InterleavePolicy::compute_once(CXLController *controller) {
+int InterleavePolicy::compute_once(LegoMemController *controller) {
     int per_size;
     switch (controller->page_type_) {
     case CACHELINE:
@@ -66,7 +66,7 @@ int InterleavePolicy::compute_once(CXLController *controller) {
         return index;
     }
 }
-int NUMAPolicy::compute_once(CXLController *controller) {
+int NUMAPolicy::compute_once(LegoMemController *controller) {
     int per_size;
     // 确定页面大小
     switch (controller->page_type_) {
@@ -139,7 +139,7 @@ int NUMAPolicy::compute_once(CXLController *controller) {
 
 // FIFOPolicy实现
 // 先进先出缓存策略
-int FIFOPolicy::compute_once(CXLController *controller) {
+int FIFOPolicy::compute_once(LegoMemController *controller) {
     int per_size;
     // 确定页面大小
     switch (controller->page_type_) {
@@ -185,7 +185,7 @@ bool FrequencyBasedInvalidationPolicy::should_invalidate(uint64_t addr, uint64_t
     }
     return false;
 }
-std::vector<uint64_t> FrequencyBasedInvalidationPolicy::get_invalidation_list(CXLController* controller){
+std::vector<uint64_t> FrequencyBasedInvalidationPolicy::get_invalidation_list(LegoMemController* controller){
     std::vector<uint64_t> to_invalidate;
 
     // 遍历缓存查找低频访问的地址
@@ -209,7 +209,7 @@ bool FrequencyBasedInvalidationPolicy::should_cache(uint64_t addr, uint64_t time
     access_count[addr]++;
     return true; // 总是缓存
 }
-int FrequencyBasedInvalidationPolicy::compute_once(CXLController *controller) {
+int FrequencyBasedInvalidationPolicy::compute_once(LegoMemController *controller) {
     // 如果有需要失效的地址，返回正数
     return !get_invalidation_list(controller).empty() ? 1 : 0;
 }

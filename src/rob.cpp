@@ -1,5 +1,5 @@
 /*
- * CXLMemSim rob
+ * LegoMem rob
  *
  *  By: Andrew Quinn
  *      Yiwei Yang
@@ -159,7 +159,7 @@ bool Rob::canRetire(const InstructionGroup &ins) {
             cur_latency = 1;
         } else {
             // For memory operations, apply pipeline-aware latency calculation
-            // The CXL pipeline model now handles overlapping requests
+            // The LegoMem pipeline model now handles overlapping requests
             baseLatency *= 0.08;  // Reduced further to account for pipeline benefits
             
             // Check for pipeline optimization scenarios
@@ -172,7 +172,7 @@ bool Rob::canRetire(const InstructionGroup &ins) {
             // Apply corrected minimum threshold
             cur_latency = std::max(1.0, baseLatency);
 
-            // For memory operations, the baseLatency already includes CXL overhead
+            // For memory operations, the baseLatency already includes LegoMem overhead
             // No need to add instruction latency again for memory ops
         }
 

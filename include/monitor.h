@@ -1,5 +1,5 @@
 /*
- * CXLMemSim monitor
+ * LegoMem monitor
  *
  *  By: Andrew Quinn
  *      Yiwei Yang
@@ -9,9 +9,9 @@
  *  UC Santa Cruz Sluglab.
  */
 
-#ifndef CXLMEMSIM_MONITOR_H
-#define CXLMEMSIM_MONITOR_H
-#include "cxlcontroller.h"
+#ifndef LEGOMEM_MONITOR_H
+#define LEGOMEM_MONITOR_H
+#include "legomemcontroller.h"
 #include "helper.h"
 #include "pebs.h"
 #include <atomic>
@@ -157,4 +157,4 @@ template <> struct std::formatter<Monitors> {
 };
 
 extern Monitors *monitors;
-#endif // CXLMEMSIM_MONITOR_H
+#endif // LEGOMEM_MONITOR_H

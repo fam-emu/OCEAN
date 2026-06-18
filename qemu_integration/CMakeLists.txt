@@ -46,8 +46,24 @@ install(FILES include/qemu_legomem.h
     DESTINATION include/legomem
 )
 
+install(PROGRAMS
+    launch_qemu_legomem.sh
+    setup_legomem_numa.sh
+    start_server.sh
+    test_concurrent.sh
+    DESTINATION bin
+)
+
+install(FILES legomem-numa-setup.service
+    DESTINATION share/legomem
+)
+
 configure_file(${CMAKE_CURRENT_SOURCE_DIR}/launch_qemu_legomem.sh
     ${CMAKE_CURRENT_BINARY_DIR}/launch_qemu_legomem.sh COPYONLY)
+configure_file(${CMAKE_CURRENT_SOURCE_DIR}/setup_legomem_numa.sh
+    ${CMAKE_CURRENT_BINARY_DIR}/setup_legomem_numa.sh COPYONLY)
+configure_file(${CMAKE_CURRENT_SOURCE_DIR}/legomem-numa-setup.service
+    ${CMAKE_CURRENT_BINARY_DIR}/legomem-numa-setup.service COPYONLY)
 configure_file(${CMAKE_CURRENT_SOURCE_DIR}/start_server.sh
     ${CMAKE_CURRENT_BINARY_DIR}/start_server.sh COPYONLY)
 configure_file(${CMAKE_CURRENT_SOURCE_DIR}/test_concurrent.sh

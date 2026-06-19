@@ -67,14 +67,43 @@ After the server is running, please set up the second VM's network address and h
 #----------------#
 # Set up two VMs
 #----------------#
+#
+# 0. Change the cxlmemsim file names in the qemu_integration/launch_qemu_cxl<N>.sh
+#
+-object memory-backend-file,id=cxl-mem1,share=on,mem-path=/dev/shm/cxlmemsim_dist_node0,size=1G \
+-object memory-backend-file,id=cxl-lsa1,share=on,mem-path=/dev/shm/lsa0.raw,size=1G \
+# Please note:
+#     - After launching the Fabric Manager Server (./cxlmemsim_server) on a host, 
+#       a memory file will be created under the host path /dev/shm, such as 
+#       /dev/shm/cxlmemsim_dist_node0. 
+#     - For the first memory backend file, the VMs launched on one host should 
+#       use the same name as the actually created file on that host. 
+#       Different hosts may have different filenames, since their cxlmemsim servers 
+#       are launched with different --node-id. The size should be the same as 
+#       the ./cxlmemsim_server option --capacity  (capacity 1024 means 1G).
+#     - For the second memory backend file (/dev/shm/lsa01.raw), all VMs should 
+#       use the same name, both for SHM mode and TCP mode.
+#     - Also make sure each VM should have unique MAC address.
+
+
+#
+# Launch the VM
+#
 cd build
 sudo ../qemu_integration/launch_qemu_cxl1.sh # login as root with password: victor129
-# in qemu
-vi /usr/local/bin/*.sh
-# change 192.168.100.10 to 11
-# change the bridge IP address to the host's bridge IP.
+# in the launched qemu VM
+# 
+# 1. Change the VM's IP address
+#
+vi /usr/local/bin/setup_cxl_numa.sh
+# Change CXL_CONFIGURE_NET to 1
+# Change CXL_HOST_ID to 1 (different across VMs), so the final IP would be 192.168.100.11
+# Change CXL_NET_GW to the host's bridge IP
+#
+# 2. Change the VM's hostname
+#
 vi /etc/hostname
-# change node0 to node1
+# change node0 to node1 (different across VMs)
 shutdown now
 ```
 

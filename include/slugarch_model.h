@@ -34,6 +34,13 @@ enum class SlugArchEventClass {
     Seal
 };
 
+enum class SlugArchRecordMode {
+    Full,
+    Delta,
+    Validation,
+    OrderingOnly
+};
+
 struct SlugArchBoundaryEvent {
     SlugArchEventClass cls;
     uint64_t src;
@@ -44,10 +51,19 @@ struct SlugArchBoundaryEvent {
     std::string label;
 };
 
+struct SlugArchRecordOptions {
+    SlugArchRecordMode mode = SlugArchRecordMode::Validation;
+    std::string payload;
+    std::string ordering;
+};
+
 struct SlugArchReplayRecord {
     uint64_t id;
     SlugArchBoundaryEvent event;
     std::vector<uint64_t> deps;
+    SlugArchRecordMode mode;
+    std::string payload;
+    std::string ordering;
     std::string commitment;
 };
 
@@ -61,11 +77,13 @@ class SlugArchReplayModel {
 public:
     void begin_epoch(uint64_t epoch);
     SlugArchReplayRecord record(const SlugArchBoundaryEvent& event,
-                                std::vector<uint64_t> deps = {});
+                                std::vector<uint64_t> deps = {},
+                                const SlugArchRecordOptions& options = {});
     SlugArchEpochSeal seal_epoch() const;
 
     bool matches(const SlugArchBoundaryEvent& event,
-                 const SlugArchReplayRecord& record) const;
+                 const SlugArchReplayRecord& record,
+                 const std::string& observed_payload = "") const;
     bool is_dependency_satisfied(const SlugArchReplayRecord& record,
                                  const std::set<uint64_t>& consumed) const;
 
@@ -74,7 +92,10 @@ private:
     uint64_t next_id_ = 1;
     std::vector<SlugArchReplayRecord> records_;
 
-    static std::string commitment_for(const SlugArchBoundaryEvent& event);
+    static std::string commitment_for(const SlugArchBoundaryEvent& event,
+                                      SlugArchRecordMode mode,
+                                      const std::string& payload,
+                                      const std::string& ordering);
 };
 
 #endif

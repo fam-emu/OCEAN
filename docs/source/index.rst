@@ -63,6 +63,7 @@ Documentation Structure
 
 * :doc:`getting-started` — Installation and initial experiments
 * :doc:`architecture` — System components and design
+* :doc:`slugarch-legomem` — SlugArch replay model for LegoMem
 * :doc:`configuration` — Build and runtime options
 * :doc:`workloads` — Running experiments and analyzing results
 
@@ -72,6 +73,7 @@ Documentation Structure
 
    getting-started
    architecture
+   slugarch-legomem
    configuration
    workloads
 

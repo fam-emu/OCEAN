@@ -1,6 +1,5 @@
 #include "slugarch_model.h"
 
-#include <functional>
 #include <sstream>
 #include <stdexcept>
 
@@ -48,10 +47,32 @@ std::string event_class_name(SlugArchEventClass cls) {
     return "unknown";
 }
 
+std::string record_mode_name(SlugArchRecordMode mode) {
+    switch (mode) {
+    case SlugArchRecordMode::Full:
+        return "full";
+    case SlugArchRecordMode::Delta:
+        return "delta";
+    case SlugArchRecordMode::Validation:
+        return "validation";
+    case SlugArchRecordMode::OrderingOnly:
+        return "ordering-only";
+    }
+    return "unknown";
+}
+
 std::string digest_string(const std::string& payload) {
-    const auto value = std::hash<std::string>{}(payload);
+    uint64_t value = 0xcbf29ce484222325ULL;
+    for (const auto c : payload) {
+        value ^= static_cast<unsigned char>(c);
+        value *= 0x100000001b3ULL;
+    }
+
     std::ostringstream out;
-    out << std::hex << value;
+    out << std::hex;
+    out.width(16);
+    out.fill('0');
+    out << value;
     return out.str();
 }
 
@@ -64,7 +85,8 @@ void SlugArchReplayModel::begin_epoch(uint64_t epoch) {
 }
 
 SlugArchReplayRecord SlugArchReplayModel::record(const SlugArchBoundaryEvent& event,
-                                                 std::vector<uint64_t> deps) {
+                                                 std::vector<uint64_t> deps,
+                                                 const SlugArchRecordOptions& options) {
     if (event.epoch != current_epoch_) {
         throw std::invalid_argument("SlugArch event epoch is not active");
     }
@@ -73,7 +95,10 @@ SlugArchReplayRecord SlugArchReplayModel::record(const SlugArchBoundaryEvent& ev
         next_id_++,
         event,
         std::move(deps),
-        commitment_for(event)
+        options.mode,
+        options.payload,
+        options.ordering,
+        commitment_for(event, options.mode, options.payload, options.ordering)
     };
     records_.push_back(record);
     return record;
@@ -86,7 +111,9 @@ SlugArchEpochSeal SlugArchReplayModel::seal_epoch() const {
     for (const auto& record : records_) {
         payload << '|'
                 << record.id << ':'
+                << record_mode_name(record.mode) << ':'
                 << record.commitment << ':'
+                << record.ordering << ':'
                 << record.event.label;
     }
 
@@ -98,7 +125,13 @@ SlugArchEpochSeal SlugArchReplayModel::seal_epoch() const {
 }
 
 bool SlugArchReplayModel::matches(const SlugArchBoundaryEvent& event,
-                                  const SlugArchReplayRecord& record) const {
+                                  const SlugArchReplayRecord& record,
+                                  const std::string& observed_payload) const {
+    const auto payload = record.mode == SlugArchRecordMode::Full ||
+                         record.mode == SlugArchRecordMode::Delta
+                             ? observed_payload
+                             : record.payload;
+
     return event.cls == record.event.cls &&
            event.src == record.event.src &&
            event.dst == record.event.dst &&
@@ -106,7 +139,7 @@ bool SlugArchReplayModel::matches(const SlugArchBoundaryEvent& event,
            event.object == record.event.object &&
            event.size == record.event.size &&
            event.label == record.event.label &&
-           commitment_for(event) == record.commitment;
+           commitment_for(event, record.mode, payload, record.ordering) == record.commitment;
 }
 
 bool SlugArchReplayModel::is_dependency_satisfied(
@@ -120,14 +153,20 @@ bool SlugArchReplayModel::is_dependency_satisfied(
     return true;
 }
 
-std::string SlugArchReplayModel::commitment_for(const SlugArchBoundaryEvent& event) {
-    std::ostringstream payload;
-    payload << event_class_name(event.cls) << ':'
-            << event.src << ':'
-            << event.dst << ':'
-            << event.epoch << ':'
-            << event.object << ':'
-            << event.size << ':'
-            << event.label;
-    return digest_string(payload.str());
+std::string SlugArchReplayModel::commitment_for(const SlugArchBoundaryEvent& event,
+                                                SlugArchRecordMode mode,
+                                                const std::string& payload,
+                                                const std::string& ordering) {
+    std::ostringstream commitment_input;
+    commitment_input << event_class_name(event.cls) << ':'
+                     << record_mode_name(mode) << ':'
+                     << event.src << ':'
+                     << event.dst << ':'
+                     << event.epoch << ':'
+                     << event.object << ':'
+                     << event.size << ':'
+                     << event.label << ':'
+                     << ordering << ':'
+                     << payload;
+    return digest_string(commitment_input.str());
 }

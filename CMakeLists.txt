@@ -75,3 +75,6 @@ add_test(NAME slugarch_model COMMAND test_slugarch_model)
 
 add_test(NAME no_legacy_memory_names
          COMMAND bash ${CMAKE_CURRENT_SOURCE_DIR}/tests/check_no_legacy_memory_names.sh)
+
+add_test(NAME ci_vm_assets_tag_only
+         COMMAND bash ${CMAKE_CURRENT_SOURCE_DIR}/tests/check_ci_vm_assets_tag_only.sh)

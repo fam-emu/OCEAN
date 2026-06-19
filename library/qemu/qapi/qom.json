@@ -688,6 +688,25 @@
             '*x-use-canonical-path-for-ramblock-id': 'bool' } }
 
 ##
+# @MemoryBackendLegoMemProperties:
+#
+# Properties for memory-backend-legomem objects.
+#
+# @server: LegoMem memory server address.  (default: "127.0.0.1")
+#
+# @port: LegoMem memory server port.  (default: 9999)
+#
+# @region-id: LegoMem memory server region identifier.  (default: 1)
+#
+# Since: 10.1
+##
+{ 'struct': 'MemoryBackendLegoMemProperties',
+  'base': 'MemoryBackendProperties',
+  'data': { '*server': 'str',
+            '*port': 'uint16',
+            '*region-id': 'uint64' } }
+
+##
 # @MemoryBackendFileProperties:
 #
 # Properties for memory-backend-file objects.
@@ -1215,6 +1234,7 @@
     { 'name': 'memory-backend-epc',
       'if': 'CONFIG_LINUX' },
     'memory-backend-file',
+    'memory-backend-legomem',
     { 'name': 'memory-backend-memfd',
       'if': 'CONFIG_LINUX' },
     'memory-backend-ram',
@@ -1293,6 +1313,7 @@
       'memory-backend-epc':         { 'type': 'MemoryBackendEpcProperties',
                                       'if': 'CONFIG_LINUX' },
       'memory-backend-file':        'MemoryBackendFileProperties',
+      'memory-backend-legomem':     'MemoryBackendLegoMemProperties',
       'memory-backend-memfd':       { 'type': 'MemoryBackendMemfdProperties',
                                       'if': 'CONFIG_LINUX' },
       'memory-backend-ram':         'MemoryBackendProperties',

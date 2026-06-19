@@ -29,7 +29,32 @@ int main() {
     };
 
     auto first = model.record(read);
-    auto second = model.record(write, {first.id});
+    if (first.commitment != "91b8517698721d89") {
+        return 8;
+    }
+
+    SlugArchRecordOptions full_options;
+    full_options.mode = SlugArchRecordMode::Full;
+    full_options.payload = "value=abcd";
+    full_options.ordering = "read-before-write";
+
+    auto second = model.record(write, {first.id}, full_options);
+
+    SlugArchRecordOptions fence_options;
+    fence_options.mode = SlugArchRecordMode::OrderingOnly;
+    fence_options.ordering = "region-fence";
+
+    SlugArchBoundaryEvent fence{
+        SlugArchEventClass::Fence,
+        1,
+        0,
+        7,
+        0x1000,
+        0,
+        "tenant-a"
+    };
+
+    auto third = model.record(fence, {second.id}, fence_options);
     auto seal = model.seal_epoch();
 
     if (first.id == second.id) {
@@ -44,8 +69,24 @@ int main() {
         return 3;
     }
 
-    if (seal.epoch != 7 || seal.record_count != 2 || seal.digest.empty()) {
+    if (second.mode != SlugArchRecordMode::Full ||
+        second.payload != "value=abcd" ||
+        second.ordering != "read-before-write") {
         return 4;
+    }
+
+    if (!model.matches(write, second, "value=abcd") ||
+        model.matches(write, second, "value=dcba")) {
+        return 5;
+    }
+
+    if (third.mode != SlugArchRecordMode::OrderingOnly ||
+        !model.matches(fence, third)) {
+        return 6;
+    }
+
+    if (seal.epoch != 7 || seal.record_count != 3 || seal.digest.empty()) {
+        return 7;
     }
 
     return 0;

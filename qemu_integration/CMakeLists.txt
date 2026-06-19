@@ -34,10 +34,19 @@ target_link_libraries(test_qemu_legomem_api
     qemu_legomem
 )
 
+add_executable(legomem_qemu_bench
+    legomem_qemu_bench.c
+)
+
+target_link_libraries(legomem_qemu_bench
+    qemu_legomem
+)
+
 enable_testing()
 add_test(NAME qemu_legomem_api COMMAND test_qemu_legomem_api)
+add_test(NAME qemu_legomem_bench_usage COMMAND legomem_qemu_bench --help)
 
-install(TARGETS qemu_legomem legomem_server test_qemu_legomem_api
+install(TARGETS qemu_legomem legomem_server test_qemu_legomem_api legomem_qemu_bench
     ARCHIVE DESTINATION lib
     RUNTIME DESTINATION bin
 )

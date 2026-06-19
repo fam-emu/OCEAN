@@ -1,2 +1,3 @@
 workloads/gromacs/gromacs-*
+workloads/gromacs/libmpi_cxl_shim.so
 build

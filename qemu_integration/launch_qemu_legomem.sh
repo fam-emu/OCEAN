@@ -38,8 +38,8 @@ exec "$QEMU_BINARY" \
     -object memory-backend-legomem,id=legomem-node1,size="$LEGOMEM_NODE_SIZE",server="$LEGOMEM_SERVER_HOST",port="$LEGOMEM_SERVER_PORT",region-id="$LEGOMEM_REGION_ID" \
     -numa node,nodeid=1,memdev=legomem-node1 \
     -kernel "$KERNEL_IMAGE" \
-    -append "root=/dev/sda rw console=ttyS0,115200 nokaslr" \
-    -drive file="$DISK_IMAGE",index=0,media=disk,format=raw \
+    -append "root=/dev/vda rw console=ttyS0,115200 nokaslr" \
+    -drive file="$DISK_IMAGE",if=virtio,format=raw \
     -netdev tap,id=net0,ifname=tap0,script=no,downscript=no \
     -device virtio-net-pci,netdev=net0,mac=52:54:00:00:00:01 \
     -fsdev local,security_model=none,id=fsdev0,path=/dev/shm \

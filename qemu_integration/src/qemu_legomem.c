@@ -3,6 +3,7 @@
 #include <arpa/inet.h>
 #include <errno.h>
 #include <netinet/in.h>
+#include <netinet/tcp.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -16,6 +17,38 @@ static uint64_t get_timestamp_ns(void) {
     return ts.tv_sec * 1000000000ULL + ts.tv_nsec;
 }
 
+static int send_all(int fd, const void *buf, size_t len) {
+    const uint8_t *pos = (const uint8_t *)buf;
+
+    while (len > 0) {
+        ssize_t sent = send(fd, pos, len, 0);
+        if (sent <= 0) {
+            return -1;
+        }
+
+        pos += sent;
+        len -= (size_t)sent;
+    }
+
+    return 0;
+}
+
+static int recv_all(int fd, void *buf, size_t len) {
+    uint8_t *pos = (uint8_t *)buf;
+
+    while (len > 0) {
+        ssize_t received = recv(fd, pos, len, MSG_WAITALL);
+        if (received <= 0) {
+            return -1;
+        }
+
+        pos += received;
+        len -= (size_t)received;
+    }
+
+    return 0;
+}
+
 static int connect_to_server(LegoMemQemuClient *client) {
     struct sockaddr_in server_addr;
 
@@ -24,6 +57,10 @@ static int connect_to_server(LegoMemQemuClient *client) {
         perror("legomem_qemu: socket");
         return -1;
     }
+
+    int nodelay = 1;
+    setsockopt(client->socket_fd, IPPROTO_TCP, TCP_NODELAY,
+               &nodelay, sizeof(nodelay));
 
     memset(&server_addr, 0, sizeof(server_addr));
     server_addr.sin_family = AF_INET;
@@ -47,7 +84,31 @@ static int connect_to_server(LegoMemQemuClient *client) {
     return 0;
 }
 
-static int send_request(LegoMemQemuClient *client, LegoMemQemuRequest *req, LegoMemQemuResponse *resp) {
+static int fail_connection(LegoMemQemuClient *client, const char *operation) {
+    perror(operation);
+    client->connected = false;
+    close(client->socket_fd);
+    client->socket_fd = -1;
+    return -1;
+}
+
+static int send_request(LegoMemQemuClient *client, uint8_t op_type,
+                        uint64_t region_id, uint64_t offset,
+                        const void *write_data, void *read_data,
+                        size_t size) {
+    LegoMemQemuRequestHeader req = {0};
+    LegoMemQemuResponseHeader resp = {0};
+
+    if (size > LEGOMEM_QEMU_MAX_TRANSFER_SIZE) {
+        return -1;
+    }
+
+    req.op_type = op_type;
+    req.region_id = region_id ? region_id : client->default_region_id;
+    req.offset = offset;
+    req.size = size;
+    req.timestamp = get_timestamp_ns();
+
     pthread_mutex_lock(&client->lock);
 
     if (!client->connected && connect_to_server(client) < 0) {
@@ -55,28 +116,42 @@ static int send_request(LegoMemQemuClient *client, LegoMemQemuRequest *req, Lego
         return -1;
     }
 
-    ssize_t sent = send(client->socket_fd, req, sizeof(*req), 0);
-    if (sent != (ssize_t)sizeof(*req)) {
-        perror("legomem_qemu: send");
-        client->connected = false;
-        close(client->socket_fd);
-        client->socket_fd = -1;
+    if (send_all(client->socket_fd, &req, sizeof(req)) < 0) {
+        fail_connection(client, "legomem_qemu: send header");
         pthread_mutex_unlock(&client->lock);
         return -1;
     }
 
-    ssize_t received = recv(client->socket_fd, resp, sizeof(*resp), MSG_WAITALL);
-    if (received != (ssize_t)sizeof(*resp)) {
-        perror("legomem_qemu: recv");
-        client->connected = false;
-        close(client->socket_fd);
-        client->socket_fd = -1;
+    if (op_type == LEGOMEM_QEMU_OP_WRITE && size > 0 &&
+        send_all(client->socket_fd, write_data, size) < 0) {
+        fail_connection(client, "legomem_qemu: send payload");
+        pthread_mutex_unlock(&client->lock);
+        return -1;
+    }
+
+    if (recv_all(client->socket_fd, &resp, sizeof(resp)) < 0) {
+        fail_connection(client, "legomem_qemu: recv header");
+        pthread_mutex_unlock(&client->lock);
+        return -1;
+    }
+
+    if (resp.status == LEGOMEM_QEMU_STATUS_OK &&
+        op_type == LEGOMEM_QEMU_OP_READ && resp.size > 0) {
+        if (resp.size > size || recv_all(client->socket_fd, read_data,
+                                         (size_t)resp.size) < 0) {
+            fail_connection(client, "legomem_qemu: recv payload");
+            pthread_mutex_unlock(&client->lock);
+            return -1;
+        }
+    }
+
+    if (resp.status != LEGOMEM_QEMU_STATUS_OK) {
         pthread_mutex_unlock(&client->lock);
         return -1;
     }
 
     pthread_mutex_unlock(&client->lock);
-    return resp->status == LEGOMEM_QEMU_STATUS_OK ? 0 : -1;
+    return 0;
 }
 
 int legomem_qemu_client_init(LegoMemQemuClient *client, const char *host, int port, uint64_t default_region_id) {
@@ -116,21 +191,15 @@ int legomem_qemu_read(LegoMemQemuClient *client, uint64_t region_id, uint64_t of
 
     size_t done = 0;
     while (done < size) {
-        LegoMemQemuRequest req = {0};
-        LegoMemQemuResponse resp = {0};
-        size_t chunk = size - done > LEGOMEM_QEMU_CACHELINE_SIZE ? LEGOMEM_QEMU_CACHELINE_SIZE : size - done;
+        size_t chunk = size - done > LEGOMEM_QEMU_MAX_TRANSFER_SIZE ?
+            LEGOMEM_QEMU_MAX_TRANSFER_SIZE : size - done;
 
-        req.op_type = LEGOMEM_QEMU_OP_READ;
-        req.region_id = region_id ? region_id : client->default_region_id;
-        req.offset = offset + done;
-        req.size = chunk;
-        req.timestamp = get_timestamp_ns();
-
-        if (send_request(client, &req, &resp) < 0) {
+        if (send_request(client, LEGOMEM_QEMU_OP_READ, region_id,
+                         offset + done, NULL, (uint8_t *)data + done,
+                         chunk) < 0) {
             return -1;
         }
 
-        memcpy((uint8_t *)data + done, resp.data, chunk);
         client->total_reads++;
         done += chunk;
     }
@@ -145,18 +214,12 @@ int legomem_qemu_write(LegoMemQemuClient *client, uint64_t region_id, uint64_t o
 
     size_t done = 0;
     while (done < size) {
-        LegoMemQemuRequest req = {0};
-        LegoMemQemuResponse resp = {0};
-        size_t chunk = size - done > LEGOMEM_QEMU_CACHELINE_SIZE ? LEGOMEM_QEMU_CACHELINE_SIZE : size - done;
+        size_t chunk = size - done > LEGOMEM_QEMU_MAX_TRANSFER_SIZE ?
+            LEGOMEM_QEMU_MAX_TRANSFER_SIZE : size - done;
 
-        req.op_type = LEGOMEM_QEMU_OP_WRITE;
-        req.region_id = region_id ? region_id : client->default_region_id;
-        req.offset = offset + done;
-        req.size = chunk;
-        req.timestamp = get_timestamp_ns();
-        memcpy(req.data, (const uint8_t *)data + done, chunk);
-
-        if (send_request(client, &req, &resp) < 0) {
+        if (send_request(client, LEGOMEM_QEMU_OP_WRITE, region_id,
+                         offset + done, (const uint8_t *)data + done, NULL,
+                         chunk) < 0) {
             return -1;
         }
 
@@ -172,12 +235,8 @@ int legomem_qemu_fence(LegoMemQemuClient *client, uint64_t region_id) {
         return -1;
     }
 
-    LegoMemQemuRequest req = {0};
-    LegoMemQemuResponse resp = {0};
-    req.op_type = LEGOMEM_QEMU_OP_FENCE;
-    req.region_id = region_id ? region_id : client->default_region_id;
-    req.timestamp = get_timestamp_ns();
-    return send_request(client, &req, &resp);
+    return send_request(client, LEGOMEM_QEMU_OP_FENCE, region_id, 0,
+                        NULL, NULL, 0);
 }
 
 int legomem_qemu_flush(LegoMemQemuClient *client, uint64_t region_id, uint64_t offset, unsigned size) {
@@ -185,12 +244,6 @@ int legomem_qemu_flush(LegoMemQemuClient *client, uint64_t region_id, uint64_t o
         return -1;
     }
 
-    LegoMemQemuRequest req = {0};
-    LegoMemQemuResponse resp = {0};
-    req.op_type = LEGOMEM_QEMU_OP_FLUSH;
-    req.region_id = region_id ? region_id : client->default_region_id;
-    req.offset = offset;
-    req.size = size;
-    req.timestamp = get_timestamp_ns();
-    return send_request(client, &req, &resp);
+    return send_request(client, LEGOMEM_QEMU_OP_FLUSH, region_id, offset,
+                        NULL, NULL, size);
 }

@@ -33,6 +33,44 @@ private:
         return offset & ~(static_cast<uint64_t>(LEGOMEM_QEMU_CACHELINE_SIZE) - 1);
     }
 
+    static bool transfer_too_large(const LegoMemQemuRequestHeader &req) {
+        return (req.op_type == LEGOMEM_QEMU_OP_READ ||
+                req.op_type == LEGOMEM_QEMU_OP_WRITE) &&
+               req.size > LEGOMEM_QEMU_MAX_TRANSFER_SIZE;
+    }
+
+    static bool recv_all(int fd, void *buf, size_t len) {
+        auto *pos = static_cast<uint8_t *>(buf);
+
+        while (len > 0) {
+            ssize_t received = recv(fd, pos, len, MSG_WAITALL);
+            if (received <= 0) {
+                return false;
+            }
+
+            pos += received;
+            len -= static_cast<size_t>(received);
+        }
+
+        return true;
+    }
+
+    static bool send_all(int fd, const void *buf, size_t len) {
+        const auto *pos = static_cast<const uint8_t *>(buf);
+
+        while (len > 0) {
+            ssize_t sent = send(fd, pos, len, 0);
+            if (sent <= 0) {
+                return false;
+            }
+
+            pos += sent;
+            len -= static_cast<size_t>(sent);
+        }
+
+        return true;
+    }
+
 public:
     explicit LegoMemServer(int port) : port(port) {}
 
@@ -64,40 +102,47 @@ public:
             return false;
         }
 
-        std::cout << "LegoMem server listening on port " << port << "\n";
+        std::cout << "LegoMem server listening on port " << port << std::endl;
         return true;
     }
 
     void handle_client(int client_fd) {
         while (running) {
-            LegoMemQemuRequest req{};
-            ssize_t received = recv(client_fd, &req, sizeof(req), MSG_WAITALL);
-            if (received == 0) {
-                break;
-            }
-            if (received != static_cast<ssize_t>(sizeof(req))) {
-                std::cerr << "failed to receive LegoMem request\n";
-                break;
-            }
-
-            LegoMemQemuResponse resp{};
+            LegoMemQemuRequestHeader req{};
+            std::vector<uint8_t> request_data;
+            std::vector<uint8_t> response_data;
+            LegoMemQemuResponseHeader resp{};
             resp.status = LEGOMEM_QEMU_STATUS_OK;
 
-            if (req.size > LEGOMEM_QEMU_CACHELINE_SIZE) {
+            if (!recv_all(client_fd, &req, sizeof(req))) {
+                break;
+            }
+
+            if (transfer_too_large(req)) {
                 resp.status = LEGOMEM_QEMU_STATUS_ERR;
             } else if (req.op_type == LEGOMEM_QEMU_OP_READ) {
-                handle_read(req, resp);
+                handle_read(req, response_data);
+                resp.size = response_data.size();
             } else if (req.op_type == LEGOMEM_QEMU_OP_WRITE) {
-                handle_write(req, resp);
+                request_data.resize(static_cast<size_t>(req.size));
+                if (!recv_all(client_fd, request_data.data(), request_data.size())) {
+                    break;
+                }
+                handle_write(req, request_data);
             } else if (req.op_type == LEGOMEM_QEMU_OP_FENCE || req.op_type == LEGOMEM_QEMU_OP_FLUSH) {
                 resp.latency_ns = 0;
             } else {
                 resp.status = LEGOMEM_QEMU_STATUS_ERR;
             }
 
-            ssize_t sent = send(client_fd, &resp, sizeof(resp), 0);
-            if (sent != static_cast<ssize_t>(sizeof(resp))) {
+            if (!send_all(client_fd, &resp, sizeof(resp))) {
                 std::cerr << "failed to send LegoMem response\n";
+                break;
+            }
+            if (resp.status == LEGOMEM_QEMU_STATUS_OK &&
+                req.op_type == LEGOMEM_QEMU_OP_READ && !response_data.empty() &&
+                !send_all(client_fd, response_data.data(), response_data.size())) {
+                std::cerr << "failed to send LegoMem response payload\n";
                 break;
             }
         }
@@ -105,29 +150,48 @@ public:
         close(client_fd);
     }
 
-    void handle_read(const LegoMemQemuRequest &req, LegoMemQemuResponse &resp) {
+    void handle_read(const LegoMemQemuRequestHeader &req,
+                     std::vector<uint8_t> &response_data) {
         std::lock_guard<std::mutex> lock(storage_mutex);
-        uint64_t line_offset = cacheline_offset(req.offset);
-        uint64_t in_line = req.offset - line_offset;
-        RegionLine &line = storage[{req.region_id, line_offset}];
-        size_t copy_size = std::min<uint64_t>(req.size, LEGOMEM_QEMU_CACHELINE_SIZE - in_line);
+        size_t done = 0;
 
-        memcpy(resp.data, line.data.data() + in_line, copy_size);
-        line.access_count++;
-        resp.latency_ns = 0;
+        response_data.resize(static_cast<size_t>(req.size));
+        while (done < response_data.size()) {
+            uint64_t offset = req.offset + done;
+            uint64_t line_offset = cacheline_offset(offset);
+            uint64_t in_line = offset - line_offset;
+            size_t copy_size = std::min<uint64_t>(
+                response_data.size() - done,
+                LEGOMEM_QEMU_CACHELINE_SIZE - in_line);
+            RegionLine &line = storage[{req.region_id, line_offset}];
+
+            memcpy(response_data.data() + done, line.data.data() + in_line,
+                   copy_size);
+            line.access_count++;
+            done += copy_size;
+        }
     }
 
-    void handle_write(const LegoMemQemuRequest &req, LegoMemQemuResponse &resp) {
+    void handle_write(const LegoMemQemuRequestHeader &req,
+                      const std::vector<uint8_t> &request_data) {
         std::lock_guard<std::mutex> lock(storage_mutex);
-        uint64_t line_offset = cacheline_offset(req.offset);
-        uint64_t in_line = req.offset - line_offset;
-        RegionLine &line = storage[{req.region_id, line_offset}];
-        size_t copy_size = std::min<uint64_t>(req.size, LEGOMEM_QEMU_CACHELINE_SIZE - in_line);
+        size_t done = 0;
 
-        memcpy(line.data.data() + in_line, req.data, copy_size);
-        line.access_count++;
-        line.version++;
-        resp.latency_ns = 0;
+        while (done < request_data.size()) {
+            uint64_t offset = req.offset + done;
+            uint64_t line_offset = cacheline_offset(offset);
+            uint64_t in_line = offset - line_offset;
+            size_t copy_size = std::min<uint64_t>(
+                request_data.size() - done,
+                LEGOMEM_QEMU_CACHELINE_SIZE - in_line);
+            RegionLine &line = storage[{req.region_id, line_offset}];
+
+            memcpy(line.data.data() + in_line, request_data.data() + done,
+                   copy_size);
+            line.access_count++;
+            line.version++;
+            done += copy_size;
+        }
     }
 
     void run() {

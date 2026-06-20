@@ -45,6 +45,10 @@ target_link_libraries(legomem_qemu_bench
 enable_testing()
 add_test(NAME qemu_legomem_api COMMAND test_qemu_legomem_api)
 add_test(NAME qemu_legomem_bench_usage COMMAND legomem_qemu_bench --help)
+add_test(NAME qemu_legomem_bulk
+         COMMAND bash ${CMAKE_CURRENT_SOURCE_DIR}/test_qemu_legomem_bulk.sh
+                 $<TARGET_FILE:legomem_server>
+                 $<TARGET_FILE:legomem_qemu_bench>)
 
 install(TARGETS qemu_legomem legomem_server test_qemu_legomem_api legomem_qemu_bench
     ARCHIVE DESTINATION lib
@@ -60,6 +64,7 @@ install(PROGRAMS
     setup_legomem_numa.sh
     start_server.sh
     test_concurrent.sh
+    test_qemu_legomem_bulk.sh
     DESTINATION bin
 )
 

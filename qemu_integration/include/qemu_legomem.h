@@ -11,6 +11,7 @@ extern "C" {
 #endif
 
 #define LEGOMEM_QEMU_CACHELINE_SIZE 64
+#define LEGOMEM_QEMU_MAX_TRANSFER_SIZE (64 * 1024)
 #define LEGOMEM_QEMU_DEFAULT_REGION_ID 1
 
 #define LEGOMEM_QEMU_OP_READ 0
@@ -46,6 +47,20 @@ typedef struct {
     uint64_t latency_ns;
     uint8_t data[LEGOMEM_QEMU_CACHELINE_SIZE];
 } LegoMemQemuResponse;
+
+typedef struct {
+    uint8_t op_type;
+    uint64_t region_id;
+    uint64_t offset;
+    uint64_t size;
+    uint64_t timestamp;
+} LegoMemQemuRequestHeader;
+
+typedef struct {
+    uint8_t status;
+    uint64_t latency_ns;
+    uint64_t size;
+} LegoMemQemuResponseHeader;
 
 int legomem_qemu_client_init(LegoMemQemuClient *client, const char *host, int port, uint64_t default_region_id);
 void legomem_qemu_client_close(LegoMemQemuClient *client);

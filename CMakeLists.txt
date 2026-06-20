@@ -78,3 +78,6 @@ add_test(NAME no_legacy_memory_names
 
 add_test(NAME ci_vm_assets_tag_only
          COMMAND bash ${CMAKE_CURRENT_SOURCE_DIR}/tests/check_ci_vm_assets_tag_only.sh)
+
+add_test(NAME qemu_legomem_launcher
+         COMMAND bash ${CMAKE_CURRENT_SOURCE_DIR}/tests/check_qemu_legomem_launcher.sh)

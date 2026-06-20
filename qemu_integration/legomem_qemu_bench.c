@@ -20,6 +20,7 @@ static void usage(const char *prog)
     printf("usage: %s [host] [port] [region_id] [iterations] [block_size]\n",
            prog);
     printf("defaults: 127.0.0.1 9999 1 10000 64\n");
+    printf("max transfer size: %u\n", LEGOMEM_QEMU_MAX_TRANSFER_SIZE);
 }
 
 static int parse_u64(const char *text, uint64_t *out)
@@ -145,8 +146,8 @@ int main(int argc, char **argv)
     seconds = (double)elapsed_ns / 1000000000.0;
     mib = (double)(iterations * block_size * 2ULL) / (1024.0 * 1024.0);
     protocol_ops = iterations * 2ULL *
-                   ((block_size + LEGOMEM_QEMU_CACHELINE_SIZE - 1ULL) /
-                    LEGOMEM_QEMU_CACHELINE_SIZE);
+                   ((block_size + LEGOMEM_QEMU_MAX_TRANSFER_SIZE - 1ULL) /
+                    LEGOMEM_QEMU_MAX_TRANSFER_SIZE);
 
     printf("host=%s port=%llu region_id=%llu iterations=%llu block_size=%llu\n",
            host, (unsigned long long)port, (unsigned long long)region_id,

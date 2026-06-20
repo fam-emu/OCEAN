@@ -10,6 +10,7 @@
 #include <map>
 #include <mutex>
 #include <netinet/in.h>
+#include <netinet/tcp.h>
 #include <sys/socket.h>
 #include <thread>
 #include <unistd.h>
@@ -205,6 +206,10 @@ public:
                 }
                 continue;
             }
+
+            int nodelay = 1;
+            setsockopt(client_fd, IPPROTO_TCP, TCP_NODELAY, &nodelay,
+                       sizeof(nodelay));
 
             std::thread(&LegoMemServer::handle_client, this, client_fd).detach();
         }

@@ -99,7 +99,9 @@ static int send_request(LegoMemQemuClient *client, uint8_t op_type,
     LegoMemQemuRequestHeader req = {0};
     LegoMemQemuResponseHeader resp = {0};
 
-    if (size > LEGOMEM_QEMU_MAX_TRANSFER_SIZE) {
+    if ((op_type == LEGOMEM_QEMU_OP_READ ||
+         op_type == LEGOMEM_QEMU_OP_WRITE) &&
+        size > LEGOMEM_QEMU_MAX_TRANSFER_SIZE) {
         return -1;
     }
 

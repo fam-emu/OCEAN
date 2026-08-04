@@ -10,7 +10,9 @@ from figures_6_9.collectors.fig9_logp import (
     parse_jsonl,
     plan_logp_command,
 )
+from figures_6_9.collectors import fig9_logp
 from figures_6_9.errors import ConfigError, ValidationError
+from figures_6_9.execution import RunResult
 
 
 def test_derive_logp_matches_paper_equation():
@@ -102,3 +104,57 @@ def test_plan_refuses_unacknowledged_dax_writes(tmp_path: Path):
 
     with pytest.raises(ConfigError, match="acknowledge_dax_writes"):
         plan_logp_command(config, tmp_path, tmp_path / "run")
+
+
+def test_collect_requires_configured_sample_count(monkeypatch, tmp_path: Path):
+    records = [
+        {"type": "metadata", "rank": rank, "world_size": 2, "iterations": 2}
+        for rank in (0, 1)
+    ]
+    records.extend(
+        {
+            "type": "sample",
+            "operation": operation,
+            "sample_id": 0,
+            "latency_ns": latency,
+        }
+        for operation, latency in (
+            ("os", 18), ("cas_raw", 120), ("cas_flush", 180),
+            ("or", 438), ("full_rt", 1200),
+        )
+    )
+    records.extend(
+        {"type": "summary", "name": name, "value": value}
+        for name, value in (("os_ns", 18), ("or_ns", 438), ("rtt_ns", 1200), ("g_ns", 4.6))
+    )
+    records.extend(
+        {
+            "type": "contention",
+            "lock_count": count,
+            "effective_utilization": 1 / count,
+            "added_latency_ns": 100 / count,
+        }
+        for count in (1, 2, 4, 8)
+    )
+    output = "\n".join(json.dumps(record) for record in records)
+    result = RunResult(("runner",), 0, output, "start", "end", False)
+    monkeypatch.setattr(fig9_logp, "execute_plan", lambda *args: result)
+    config = {
+        "run": {"source": "measured", "timeout_s": 1},
+        "fig9": {
+            "workdir": str(tmp_path),
+            "command": ["runner"],
+            "dax_path": "/dev/dax0.0",
+            "iterations": 2,
+            "map_offset": 0,
+            "map_size": 2 * 1024 * 1024,
+            "acknowledge_dax_writes": True,
+            "default_o_s_ns": 20,
+            "default_L_ns": 150,
+            "default_o_r_ns": 20,
+            "default_g_ns": 4,
+        },
+    }
+
+    with pytest.raises(ValidationError, match="expected 2 samples"):
+        fig9_logp.collect_logp(config, tmp_path, tmp_path / "run", False)

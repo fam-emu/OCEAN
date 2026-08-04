@@ -1,3 +1,4 @@
+from collections import Counter
 from dataclasses import dataclass
 import json
 import math
@@ -165,11 +166,23 @@ def collect_logp(
         }, [result]
 
     parsed = parse_jsonl(result.output, source, 0)
+    section = config["fig9"]
     operations = {row["operation"] for row in parsed.samples}
     required_operations = {"os", "cas_raw", "cas_flush", "or", "full_rt"}
     if operations != required_operations:
         raise ValidationError(
             f"fig9: missing operation samples: {sorted(required_operations - operations)}"
+        )
+    expected_samples = int(section["iterations"])
+    sample_counts = Counter(str(row["operation"]) for row in parsed.samples)
+    short = {
+        operation: sample_counts[operation]
+        for operation in required_operations
+        if sample_counts[operation] != expected_samples
+    }
+    if short:
+        raise ValidationError(
+            f"fig9: expected {expected_samples} samples per operation, got {short}"
         )
     required_summaries = {"os_ns", "or_ns", "rtt_ns", "g_ns"}
     if not required_summaries <= parsed.summaries.keys():
@@ -178,6 +191,17 @@ def collect_logp(
         )
     if {int(item.get("rank", -1)) for item in parsed.metadata} != {0, 1}:
         raise ValidationError("fig9: metadata from both MPI ranks is required")
+    if any(
+        int(item.get("world_size", -1)) != 2
+        or int(item.get("iterations", -1)) != expected_samples
+        for item in parsed.metadata
+    ):
+        raise ValidationError("fig9: inconsistent two-rank benchmark metadata")
+    contention_locks = {int(row["lock_count"]) for row in parsed.contention}
+    if contention_locks != {1, 2, 4, 8}:
+        raise ValidationError(
+            "fig9: contention requires lock counts 1, 2, 4, and 8"
+        )
 
     measured = derive_logp(
         parsed.summaries["os_ns"],
@@ -185,7 +209,6 @@ def collect_logp(
         parsed.summaries["rtt_ns"],
         parsed.summaries["g_ns"],
     )
-    section = config["fig9"]
     default = {
         "o_s_ns": float(section["default_o_s_ns"]),
         "L_ns": float(section["default_L_ns"]),

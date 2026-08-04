@@ -177,6 +177,45 @@ static double measure_full_round_trip(volatile uint64_t *address) {
     return elapsed_ns(start, ns_now());
 }
 
+static double ping_pong_round_trip(volatile uint8_t *mapping,
+                                   const struct options *options, int rank) {
+    volatile uint64_t *request =
+        (volatile uint64_t *)(mapping + CACHE_LINE * 4u);
+    volatile uint64_t *response =
+        (volatile uint64_t *)(mapping + CACHE_LINE * 5u);
+    if (rank == 0) {
+        *request = 0;
+        *response = 0;
+        flush_sender((void *)request);
+        flush_sender((void *)response);
+    }
+    MPI_Barrier(MPI_COMM_WORLD);
+
+    double total = 0.0;
+    for (uint64_t sample = 0; sample < options->iterations; ++sample) {
+        uint64_t token = sample + 1;
+        if (rank == 0) {
+            uint64_t start = ns_now();
+            *request = token;
+            flush_sender((void *)request);
+            while (invalidate_load(response) != token) {
+                _mm_pause();
+            }
+            double duration = elapsed_ns(start, ns_now());
+            emit_sample("full_rt", sample, duration);
+            total += duration;
+        } else {
+            while (invalidate_load(request) != token) {
+                _mm_pause();
+            }
+            *response = token;
+            flush_sender((void *)response);
+        }
+    }
+    MPI_Barrier(MPI_COMM_WORLD);
+    return rank == 0 ? total / (double)options->iterations : 0.0;
+}
+
 static double measure_stream_gap(volatile uint8_t *base) {
     uint64_t start = ns_now();
     for (unsigned line = 0; line < STREAM_LINES; ++line) {
@@ -204,6 +243,10 @@ static double contention_phase(volatile uint64_t *locks, unsigned lock_count,
 static int run_benchmark(volatile uint8_t *mapping, const struct options *options,
                          int rank, int world_size) {
     volatile uint64_t *value = (volatile uint64_t *)mapping;
+    volatile uint64_t *cas_raw =
+        (volatile uint64_t *)(mapping + CACHE_LINE);
+    volatile uint64_t *cas_flush =
+        (volatile uint64_t *)(mapping + CACHE_LINE * 2u);
     volatile uint64_t *locks = (volatile uint64_t *)(mapping + CACHE_LINE * 16u);
     emit_metadata(rank, world_size, options);
     MPI_Barrier(MPI_COMM_WORLD);
@@ -211,13 +254,14 @@ static int run_benchmark(volatile uint8_t *mapping, const struct options *option
     double os_total = 0.0;
     double or_total = 0.0;
     double full_total = 0.0;
+    double cas_raw_total = 0.0;
     if (rank == 0) {
         for (uint64_t sample = 0; sample < options->iterations; ++sample) {
             double os_ns = measure_flush(value);
-            double cas_raw_ns = measure_cas(value + 1, false);
-            double cas_flush_ns = measure_cas(value + 2, true);
+            double cas_raw_ns = measure_cas(cas_raw, false);
+            double cas_flush_ns = measure_cas(cas_flush, true);
             double or_ns = measure_invalidate_load(value);
-            double full_ns = measure_full_round_trip(value);
+            double full_ns = options->self_test ? measure_full_round_trip(value) : 0.0;
             if (!isfinite(cas_raw_ns) || !isfinite(cas_flush_ns)) {
                 fprintf(stderr, "CAS measurement failed\n");
                 return 1;
@@ -226,19 +270,31 @@ static int run_benchmark(volatile uint8_t *mapping, const struct options *option
             emit_sample("cas_raw", sample, cas_raw_ns);
             emit_sample("cas_flush", sample, cas_flush_ns);
             emit_sample("or", sample, or_ns);
-            emit_sample("full_rt", sample, full_ns);
+            if (options->self_test) {
+                emit_sample("full_rt", sample, full_ns);
+            }
             os_total += os_ns;
             or_total += or_ns;
-            full_total += full_ns;
+            cas_raw_total += cas_raw_ns;
+            if (options->self_test) {
+                full_total += full_ns;
+            }
         }
+    }
+
+    double rtt_ns = options->self_test
+                        ? full_total / (double)options->iterations
+                        : ping_pong_round_trip(mapping, options, rank);
+    if (rank == 0) {
         emit_summary("os_ns", os_total / (double)options->iterations);
         emit_summary("or_ns", or_total / (double)options->iterations);
-        emit_summary("rtt_ns", full_total / (double)options->iterations);
+        emit_summary("rtt_ns", rtt_ns);
         emit_summary("g_ns", measure_stream_gap(mapping + CACHE_LINE * 64u));
         fflush(stdout);
     }
 
-    double baseline = 0.0;
+    double baseline =
+        rank == 0 ? cas_raw_total / (double)options->iterations : 0.0;
     const unsigned lock_counts[] = {1, 2, 4, 8};
     for (size_t index = 0; index < sizeof(lock_counts) / sizeof(lock_counts[0]); ++index) {
         unsigned lock_count = lock_counts[index];
@@ -250,9 +306,6 @@ static int run_benchmark(volatile uint8_t *mapping, const struct options *option
         double max_average = 0.0;
         MPI_Reduce(&average, &max_average, 1, MPI_DOUBLE, MPI_MAX, 0, MPI_COMM_WORLD);
         if (rank == 0) {
-            if (index == 0) {
-                baseline = max_average;
-            }
             emit_contention(lock_count, 1.0 / (double)lock_count,
                             fmax(max_average - baseline, 0.0));
             fflush(stdout);
@@ -286,6 +339,13 @@ int main(int argc, char **argv) {
     if (!options.self_test && world_size != 2) {
         if (rank == 0) {
             fprintf(stderr, "hardware benchmark requires exactly two MPI ranks\n");
+        }
+        MPI_Finalize();
+        return 2;
+    }
+    if (options.self_test && world_size != 1) {
+        if (rank == 0) {
+            fprintf(stderr, "self-test requires exactly one MPI rank\n");
         }
         MPI_Finalize();
         return 2;
@@ -342,7 +402,10 @@ int main(int argc, char **argv) {
         return 2;
     }
 
-    memset(mapping, 0, options.map_size);
+    if (rank == 0) {
+        memset(mapping, 0, options.map_size);
+    }
+    MPI_Barrier(MPI_COMM_WORLD);
     int status = run_benchmark((volatile uint8_t *)mapping, &options, rank, world_size);
     munmap(mapping, options.map_size);
     if (dax_fd >= 0) {

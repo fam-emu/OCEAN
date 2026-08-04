@@ -9914,3 +9914,4 @@ workloads/gromacs/gromacs-2025.3/build/src/external/build-fftw/fftwBuild-prefix/
 build
 build-qemu-legomem
 build-legomem-core
+.worktrees/

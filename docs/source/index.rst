@@ -66,6 +66,7 @@ Documentation Structure
 * :doc:`slugarch-legomem` — SlugArch replay model for LegoMem
 * :doc:`configuration` — Build and runtime options
 * :doc:`workloads` — Running experiments and analyzing results
+* :doc:`reproducing-figures-6-9` — Collecting and plotting paper Figures 6--9
 
 .. toctree::
    :maxdepth: 1
@@ -76,6 +77,7 @@ Documentation Structure
    slugarch-legomem
    configuration
    workloads
+   reproducing-figures-6-9
 
 Community
 ---------

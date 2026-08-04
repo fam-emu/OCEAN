@@ -9918,4 +9918,5 @@ build-legomem-core
 artifact/figures_6_9/
 script/figures_6_9/__pycache__/
 tests/figures_6_9/__pycache__/
+__pycache__/
 .pytest_cache/

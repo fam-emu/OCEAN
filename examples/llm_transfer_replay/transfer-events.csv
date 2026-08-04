@@ -1,0 +1,5 @@
+schema_version,event_id,request_id,object_id,object_type,data_type,phase,layer_id,issue_time_ns,need_time_ns,logical_address,bytes,direction,source_tier,destination_tier,client_id,queue_id,queue_depth,transfer_granularity_bytes,can_overlap,dependency_ids,provenance
+1,xfer-weight-1-prefill,request-0,weight-layer-1,weight,bfloat16,prefill,1,0,100000,0,1048576,REMOTE_TO_GPU,CXL_MEMORY,GPU_HBM,client-0,queue-0,16,4096,true,,synthetic
+1,xfer-weight-2-prefill,request-0,weight-layer-2,weight,bfloat16,prefill,2,0,200000,4194304,1048576,REMOTE_TO_GPU,CXL_MEMORY,GPU_HBM,client-1,queue-0,16,4096,true,xfer-weight-1-prefill,synthetic
+1,xfer-weight-1-decode,request-0,weight-layer-1,weight,bfloat16,decode,1,500000,600000,0,1048576,REMOTE_TO_GPU,CXL_MEMORY,GPU_HBM,client-0,queue-0,16,4096,true,,synthetic
+1,xfer-kv-write-decode,request-0,kv-block-0,kv_cache,bfloat16,decode,1,500000,650000,8388608,524288,GPU_TO_REMOTE,GPU_HBM,CXL_MEMORY,client-1,queue-0,16,4096,true,,synthetic

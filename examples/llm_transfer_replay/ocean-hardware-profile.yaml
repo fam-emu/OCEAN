@@ -1,0 +1,32 @@
+schema_version: 1
+profile_name: synthetic-cxl-direct
+
+path:
+  mode: direct_dma
+
+latency:
+  base_ns: 150
+  media_ns: 100
+  local_to_gpu_ns: 3000
+
+bandwidth:
+  read_gib_s: 32
+  write_gib_s: 24
+  gpu_link_gib_s: 52
+  local_dram_gib_s: 40
+
+capacity_gib: 16
+transfer_granularity_bytes: 4096
+detailed_threshold_bytes: 1048576
+
+topology:
+  num_expanders: 1
+  switch_hops: 1
+  per_hop_latency_ns: 50
+  num_ports: 1
+
+queue:
+  num_clients: 2
+  depth: 16
+  max_outstanding_requests: 16
+  congestion_model: fifo

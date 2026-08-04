@@ -79,4 +79,3 @@ Passing Python tests, ``doctor``, plotting synthetic fixtures, or running the
 anonymous-memory Figure 9 self-test does not prove Tigon, GROMACS, or cross-host
 CXL measurements. A measured reproduction requires successful workload logs and,
 for Figure 9, two-host execution against the shared real CXL Type-3 DAX range.
-

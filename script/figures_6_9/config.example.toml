@@ -1,0 +1,35 @@
+[run]
+output_root = "artifact/figures_6_9"
+repetitions = 3
+timeout_s = 3600
+source = "measured"
+
+[fig6]
+workdir = "workloads/tigon"
+coverage_pct = [0, 25, 50, 70, 80, 90, 100]
+command = ["./scripts/run_figure6.sh", "--coverage", "{coverage_pct}"]
+
+[fig7]
+workdir = "workloads/tigon"
+protocols = ["Tigon", "DS2PL+", "Sundial+"]
+write_ratio_pct = [0, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100]
+command = ["./scripts/run_figure7.sh", "--protocol", "{protocol}", "--write-ratio", "{write_ratio_pct}"]
+
+[fig8]
+workdir = "workloads/gromacs"
+backends = ["SHM", "TCP"]
+policies = ["Baseline", "Interleave", "NUMA", "Frequency", "PageTableAware", "FIFO", "HeatAware", "Hybrid", "Locality", "CacheFrequency", "HugePage", "Lifetime", "LoadBalance"]
+command = ["./run_figure8.sh", "--backend", "{backend}", "--policy", "{policy}"]
+
+[fig9]
+workdir = "."
+command = ["mpirun", "-np", "2", "--hostfile", "hostfile", "build/microbench/cxl_switch_lock_bench_mpi", "--dax", "{dax_path}", "--iterations", "{iterations}", "--map-offset", "{map_offset}", "--map-size", "{map_size}", "--acknowledge-dax-write"]
+dax_path = "/dev/dax0.0"
+iterations = 10000
+map_offset = 0
+map_size = 2097152
+acknowledge_dax_writes = false
+default_o_s_ns = 20.0
+default_L_ns = 150.0
+default_o_r_ns = 20.0
+default_g_ns = 4.0

@@ -555,7 +555,7 @@ std::vector<ServiceEvent> TensorTransferModel::replay(const std::vector<Transfer
             core_result.push_back(std::move(event));
         }
         const auto counters = controller.debugCounters();
-        evidence_.backend_implementation = "CXLMemSimBulkController::service->HDMDecoder::decode->"
+        evidence_.backend_implementation = "CXLMemSimBulkController::service->RegionDecoder::decode(HDM)->"
                                            "CXLMemSimBulkExpander::serviceChunk";
         evidence_.effective_topology = controller.effectiveTopology();
         evidence_.controller_service_calls = counters.controller_service_calls;

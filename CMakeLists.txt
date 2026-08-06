@@ -55,7 +55,7 @@ set_target_properties(legomem_latency PROPERTIES
 # QEMU, TCP, ROB, spdlog, or cxxopts dependency so that LLM transfer traces can
 # be modeled in isolation and in minimal CI environments.
 add_library(llm_transfer_model STATIC
-    src/hdm_decoder.cpp
+    src/region_decoder.cpp
     src/llm_bulk_core.cpp
     src/llm_transfer_model.cpp)
 target_include_directories(llm_transfer_model PUBLIC include)

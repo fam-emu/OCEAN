@@ -10,7 +10,7 @@
 #ifndef CXLMEMSIM_LLM_BULK_CORE_H
 #define CXLMEMSIM_LLM_BULK_CORE_H
 
-#include "hdm_decoder.h"
+#include "region_decoder.h"
 
 #include <cstdint>
 #include <memory>
@@ -110,7 +110,7 @@ class CXLMemSimBulkController {
 
   private:
     BulkCoreProfile profile_;
-    HDMDecoder decoder_;
+    RegionDecoder decoder_;
     std::vector<std::unique_ptr<CXLMemSimBulkExpander>> expanders_;
     uint64_t controller_service_calls_ = 0;
     uint64_t hdm_decode_calls_ = 0;

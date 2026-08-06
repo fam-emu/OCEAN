@@ -82,7 +82,7 @@ CXLMemSimBulkExpander::ChunkCompletion CXLMemSimBulkExpander::serviceChunk(doubl
 }
 
 CXLMemSimBulkController::CXLMemSimBulkController(BulkCoreProfile profile)
-    : profile_(std::move(profile)), decoder_(HDMDecoderMode::INTERLEAVED) {
+    : profile_(std::move(profile)), decoder_(RegionDecoderMode::INTERLEAVED) {
     if (profile_.capacity_bytes == 0 || profile_.num_expanders == 0 || profile_.num_ports == 0 ||
         profile_.max_outstanding_requests == 0) {
         throw std::runtime_error("bulk core capacity, expanders, ports, and "
@@ -130,7 +130,7 @@ BulkMemoryCompletion CXLMemSimBulkController::service(const BulkMemoryRequest &r
         const auto decoded = decoder_.decode(address % profile_.capacity_bytes);
         ++hdm_decode_calls_;
         if (decoded.target_id == UINT32_MAX || decoded.target_id >= expanders_.size()) {
-            throw std::runtime_error("HDM decoder could not route bulk request " + request.event_id);
+            throw std::runtime_error("region decoder could not route bulk request " + request.event_id);
         }
         auto completion = expanders_[decoded.target_id]->serviceChunk(
             std::max(static_cast<double>(request.issue_time_ns), request.dependency_ready_ns), size, request.is_write);
@@ -171,8 +171,8 @@ BulkCoreDebugCounters CXLMemSimBulkController::debugCounters() const noexcept {
 
 std::string CXLMemSimBulkController::effectiveTopology() const {
     std::ostringstream out;
-    out << "HDMDecoder(INTERLEAVED)->" << profile_.num_expanders << "xCXLMemSimBulkExpander(" << profile_.num_ports
-        << " ports," << profile_.topology_latency_ns << "ns topology)";
+    out << "RegionDecoder(HDM,INTERLEAVED)->" << profile_.num_expanders << "xCXLMemSimBulkExpander("
+        << profile_.num_ports << " ports," << profile_.topology_latency_ns << "ns topology)";
     return out.str();
 }
 

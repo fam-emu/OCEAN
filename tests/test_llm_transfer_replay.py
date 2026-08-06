@@ -259,7 +259,7 @@ class LLMTransferReplayTests(unittest.TestCase):
         self.assertEqual(
             metadata["hdm_decode_calls"], metadata["expander_service_calls"]
         )
-        self.assertIn("HDMDecoder::decode", metadata["backend_implementation"])
+        self.assertIn("RegionDecoder::decode(HDM)", metadata["backend_implementation"])
 
     def test_core_and_analytical_match_one_chunk_without_contention(self) -> None:
         source = REPO / "examples" / "llm_transfer_replay" / "transfer-events.csv"

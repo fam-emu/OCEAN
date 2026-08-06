@@ -14,10 +14,10 @@ H100/NUMA observations remain `measured`. These labels are not interchangeable.
 
 | Component | Existing API / behavior | Reuse decision |
 |---|---|---|
-| `src/main_server.cc` | Constructs `CXLController`, accepts QEMU/TCP requests, then adds server-side congestion, coherency and a fixed transfer term | Keep for Phase-1 functional regression; exclude from the LLM performance path to avoid TCP wall time and double counting |
-| `include/cxlcontroller.h`, `src/cxlcontroller.cpp` | `construct_topo()`, `insert()`, `calculate_latency()`, `calculate_bandwidth()` over access tuples | The legacy entry is CPU/ROB and Linux-server coupled. The dependency-light `CXLMemSimBulkController::service()` is the explicit bulk controller entry. |
-| `include/cxlendpoint.h`, `src/cxlendpoint.cpp` | `CXLMemExpander`, `CXLSwitch`, `RemoteCXLExpander`, `FabricLink`; cache-line latency, bandwidth windows and conflict congestion | The old endpoint remains intact. `CXLMemSimBulkExpander::serviceChunk()` is the explicit byte/ns service method with per-port FIFO state. |
-| `include/hdm_decoder.h`, `src/hdm_decoder.cpp` | Range, interleaved and hybrid address decoding | Directly reused by the core backend: every modeled chunk calls `HDMDecoder::decode()`. |
+| `src/main_server.cc` | Constructs `LegoMemController`, accepts QEMU/TCP requests, then adds server-side congestion and coherency | Keep for functional regression; exclude from the LLM performance path to avoid TCP wall time and double counting |
+| `include/legomemcontroller.h`, `src/legomemcontroller.cpp` | `construct_topo()`, `insert()`, `calculate_latency()`, `calculate_bandwidth()` over access tuples | The legacy entry is CPU/ROB and Linux-server coupled. The dependency-light `CXLMemSimBulkController::service()` is the explicit bulk controller entry. |
+| `include/legomemendpoint.h`, `src/legomemendpoint.cpp` | `LegoMemMemoryEndpoint`, `LegoMemSwitch`, and `RemoteLegoMemEndpoint`; cache-line latency, bandwidth windows and conflict congestion | The old endpoint remains intact. `CXLMemSimBulkExpander::serviceChunk()` is the explicit byte/ns service method with per-port FIFO state. |
+| `include/region_decoder.h`, `src/region_decoder.cpp` | Host-managed Device Memory range, interleaved and hybrid address decoding | Directly reused by the core backend: every modeled chunk calls `RegionDecoder::decode()`. |
 | `include/rob.h`, `src/rob.cpp`, `src/rob.cc` | Parses CPU/O3PipeView instruction events and advances a reorder buffer | Not used: a GPU tensor demand is not a CPU load instruction and a GiB tensor must not become millions of ROB entries |
 | cache/migration/coherency code | Models CPU cache and page/coherency behaviors | Disabled in the initial read-mostly LLM bulk model; may become an explicit optional model later |
 
@@ -45,7 +45,7 @@ transfer-events.csv
        -> selected backend
           -> analytical closed-form reference, or
           -> CXLMemSimBulkController::service()
-             -> HDMDecoder::decode()
+             -> RegionDecoder::decode() [HDM mapping]
              -> CXLMemSimBulkExpander::serviceChunk()
              -> per-expander/per-port FIFO
     -> ocean-service-events.csv
@@ -81,7 +81,7 @@ For the analytical backend, `service_start` is the maximum of issue time,
 declared transfer-dependency completion, and the selected port's FIFO-ready
 time. It charges one fixed latency per bulk request. For the core backend, the
 controller splits a `detailed` request into configured chunks, routes every
-chunk through `HDMDecoder`, and calls the selected bulk expander's service
+chunk through the host-managed `RegionDecoder`, and calls the selected bulk expander's service
 method. The parent completion is reconstructed from its completion-critical
 chunk and labeled `critical_chunk_decomposition`. `aggregate` sends one parent
 chunk, while `auto` avoids per-page expansion above the detailed threshold.

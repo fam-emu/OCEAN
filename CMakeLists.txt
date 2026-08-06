@@ -54,7 +54,10 @@ set_target_properties(legomem_latency PROPERTIES
 # Standalone tensor/KV-block replay core.  This target deliberately has no
 # QEMU, TCP, ROB, spdlog, or cxxopts dependency so that LLM transfer traces can
 # be modeled in isolation and in minimal CI environments.
-add_library(llm_transfer_model STATIC src/llm_transfer_model.cpp)
+add_library(llm_transfer_model STATIC
+    src/hdm_decoder.cpp
+    src/llm_bulk_core.cpp
+    src/llm_transfer_model.cpp)
 target_include_directories(llm_transfer_model PUBLIC include)
 
 add_executable(llm_transfer_replay src/llm_transfer_replay.cpp)

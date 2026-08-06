@@ -15,6 +15,7 @@
 namespace cxlmemsim::llm {
 
 enum class ReplayMode { Auto, Aggregate, Detailed };
+enum class ReplayBackend { Analytical, CXLMemSimCore };
 
 struct HardwareProfile {
     int schema_version = 1;
@@ -69,6 +70,7 @@ struct ServiceEvent {
     int schema_version = 1;
     std::string event_id;
     std::string endpoint_id;
+    uint32_t port_id = 0;
     std::string direction;
     uint64_t issue_time_ns = 0;
     double service_start_ns = 0.0;
@@ -83,32 +85,49 @@ struct ServiceEvent {
     double effective_bandwidth_gib_s = 0.0;
     uint64_t requested_bytes = 0;
     uint64_t modeled_bytes = 0;
+    uint64_t chunk_count = 1;
     bool capacity_hit = true;
+    std::string backend;
     std::string model_mode;
     std::string model_assumptions;
     std::string provenance = "modeled";
 };
 
-HardwareProfile loadHardwareProfile(const std::string& path);
-std::vector<TransferRequest> loadTransferRequestsCsv(const std::string& path);
-void writeServiceEventsCsv(const std::string& path, const std::vector<ServiceEvent>& events);
-void writeReplayMetadataJson(const std::string& path, const HardwareProfile& profile,
-                             const std::vector<ServiceEvent>& events, ReplayMode mode);
-
-class TensorTransferModel {
-public:
-    explicit TensorTransferModel(HardwareProfile profile);
-
-    std::vector<ServiceEvent> replay(const std::vector<TransferRequest>& requests,
-                                     ReplayMode mode = ReplayMode::Auto) const;
-
-private:
-    HardwareProfile profile_;
+struct ReplayEvidence {
+    std::string backend_implementation;
+    std::string effective_topology;
+    uint64_t controller_service_calls = 0;
+    uint64_t hdm_decode_calls = 0;
+    uint64_t expander_service_calls = 0;
+    uint64_t chunk_count = 0;
 };
 
-ReplayMode parseReplayMode(const std::string& value);
+HardwareProfile loadHardwareProfile(const std::string &path);
+std::vector<TransferRequest> loadTransferRequestsCsv(const std::string &path);
+void writeServiceEventsCsv(const std::string &path, const std::vector<ServiceEvent> &events);
+void writeReplayMetadataJson(const std::string &path, const HardwareProfile &profile,
+                             const std::vector<ServiceEvent> &events, ReplayMode mode, ReplayBackend backend,
+                             const ReplayEvidence &evidence, const std::string &hardware_profile_path,
+                             const std::string &input_trace_path);
+
+class TensorTransferModel {
+  public:
+    explicit TensorTransferModel(HardwareProfile profile);
+
+    std::vector<ServiceEvent> replay(const std::vector<TransferRequest> &requests, ReplayMode mode = ReplayMode::Auto,
+                                     ReplayBackend backend = ReplayBackend::Analytical) const;
+    const ReplayEvidence &evidence() const noexcept { return evidence_; }
+
+  private:
+    HardwareProfile profile_;
+    mutable ReplayEvidence evidence_;
+};
+
+ReplayMode parseReplayMode(const std::string &value);
 std::string replayModeName(ReplayMode mode);
+ReplayBackend parseReplayBackend(const std::string &value);
+std::string replayBackendName(ReplayBackend backend);
 
-}  // namespace cxlmemsim::llm
+} // namespace cxlmemsim::llm
 
-#endif  // CXLMEMSIM_LLM_TRANSFER_MODEL_H
+#endif // CXLMEMSIM_LLM_TRANSFER_MODEL_H

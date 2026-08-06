@@ -14,6 +14,8 @@ mkdir -p "$build_dir"
   -Wextra \
   -Werror \
   -I"$repo_root/include" \
+  "$repo_root/src/hdm_decoder.cpp" \
+  "$repo_root/src/llm_bulk_core.cpp" \
   "$repo_root/src/llm_transfer_model.cpp" \
   "$repo_root/src/llm_transfer_replay.cpp" \
   -o "$build_dir/llm_transfer_replay"

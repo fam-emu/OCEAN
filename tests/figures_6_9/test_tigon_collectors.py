@@ -10,6 +10,11 @@ from figures_6_9.collectors.fig6_tpcc import (
 )
 from figures_6_9.collectors.fig7_ycsb import parse_ycsb, plan_ycsb_commands
 from figures_6_9.errors import UnavailableError, ValidationError
+from figures_6_9.runners.fig6_tigon import (
+    build_tpcc_argv,
+    hcc_budget_bytes,
+    parse_average_commit,
+)
 
 
 def test_parse_tpcc_emits_node_rows():
@@ -58,6 +63,81 @@ def test_planners_expand_complete_configured_sweeps(tmp_path: Path):
     assert fig6[-1].argv == ("runner", "--coverage", "25")
     assert len(fig7) == 8
     assert fig7[-1].argv == ("runner", "DS2PL+", "10")
+
+
+def test_planner_expands_repository_and_workdir_placeholders(tmp_path: Path):
+    tigon = tmp_path / "tigon"
+    tigon.mkdir()
+    config = {
+        "run": {"repetitions": 1},
+        "fig6": {
+            "workdir": str(tigon),
+            "coverage_pct": [25],
+            "command": [
+                "python3",
+                "{repo_root}/script/figures_6_9/runners/fig6_tigon.py",
+                "--tigon-root",
+                "{workdir}",
+                "--coverage",
+                "{coverage_pct}",
+            ],
+        },
+    }
+
+    plans = plan_tpcc_commands(config, tmp_path, tmp_path / "run")
+
+    assert plans[0].argv == (
+        "python3",
+        str(tmp_path / "script/figures_6_9/runners/fig6_tigon.py"),
+        "--tigon-root",
+        str(tigon),
+        "--coverage",
+        "25",
+    )
+
+
+@pytest.mark.parametrize(
+    ("coverage", "expected"),
+    [(0, 0), (25, 52_428_800), (70, 146_800_640), (100, 209_715_200)],
+)
+def test_hcc_coverage_maps_to_200_mib_budget(coverage: int, expected: int):
+    assert hcc_budget_bytes(coverage) == expected
+
+
+def test_parse_average_commit_uses_completed_summary():
+    output = (
+        "commit: 100 abort: 2\n"
+        "average commit: 6123.5 abort: 10.0\n"
+    )
+
+    assert parse_average_commit(output) == 6123.5
+
+
+def test_parse_average_commit_rejects_missing_summary():
+    with pytest.raises(ValidationError, match="average commit"):
+        parse_average_commit("commit: 100 abort: 2\n")
+
+
+def test_figure6_command_is_neworder_with_required_persistence_flags():
+    argv = build_tpcc_argv(
+        node_id=1,
+        servers="192.168.100.10:1234;192.168.100.11:1234",
+        budget_bytes=52_428_800,
+        dax_path="/dev/dax0.0",
+        workers=1,
+        run_seconds=10,
+        warmup_seconds=2,
+    )
+
+    assert argv[0] == "./bench_tpcc"
+    assert "--id=1" in argv
+    assert "--query=neworder" in argv
+    assert "--hw_cc_budget=52428800" in argv
+    assert "--enable_scc=1" in argv
+    assert "--scc_mechanism=WriteThrough" in argv
+    assert "--persist_latency=0" in argv
+    assert "--wal_group_commit_time=0" in argv
+    assert "--wal_group_commit_size=0" in argv
 
 
 def test_planner_reports_missing_tigon_workdir(tmp_path: Path):

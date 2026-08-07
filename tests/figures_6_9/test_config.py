@@ -19,6 +19,15 @@ def test_expand_command_rejects_unknown_placeholder():
         expand_command(["runner", "{missing}"], {"coverage_pct": 25})
 
 
+def test_example_config_points_at_external_tigon_tree(repo_root: Path):
+    loaded = load_config(
+        repo_root / "script/figures_6_9/config.example.toml", repo_root
+    )
+
+    assert loaded["fig6"]["workdir"] == "../../CXLMemSim/workloads/tigon"
+    assert "{repo_root}" in loaded["fig6"]["command"][1]
+
+
 def test_example_config_loads(repo_root: Path):
     loaded = load_config(
         repo_root / "script/figures_6_9/config.example.toml", repo_root

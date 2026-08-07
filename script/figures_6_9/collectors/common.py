@@ -54,7 +54,12 @@ def make_plan(
         isinstance(token, str) for token in command
     ):
         raise ConfigError(f"{section_name}.command must be a nonempty TOML array")
-    argv = tuple(expand_command(command, values))
+    expansion_values = {
+        "repo_root": str(repo_root),
+        "workdir": str(workdir),
+        **values,
+    }
+    argv = tuple(expand_command(command, expansion_values))
     return PlannedRun(argv, workdir, log_path, values)
 
 

@@ -5,9 +5,9 @@ timeout_s = 3600
 source = "measured"
 
 [fig6]
-workdir = "workloads/tigon"
+workdir = "../../CXLMemSim/workloads/tigon"
 coverage_pct = [0, 25, 50, 70, 80, 90, 100]
-command = ["./scripts/run_figure6.sh", "--coverage", "{coverage_pct}"]
+command = ["python3", "{repo_root}/script/figures_6_9/runners/fig6_tigon.py", "--tigon-root", "{workdir}", "--coverage", "{coverage_pct}"]
 
 [fig7]
 workdir = "workloads/tigon"

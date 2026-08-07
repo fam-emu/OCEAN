@@ -106,9 +106,39 @@ def test_plan_refuses_unacknowledged_dax_writes(tmp_path: Path):
         plan_logp_command(config, tmp_path, tmp_path / "run")
 
 
+@pytest.mark.parametrize(
+    ("map_offset", "map_size"),
+    [(4096, 4096), (0, 2 * 1024 * 1024 + 1)],
+)
+def test_plan_refuses_dax_ranges_outside_approved_first_2_mib(
+    tmp_path: Path, map_offset: int, map_size: int
+):
+    config = {
+        "run": {"repetitions": 1},
+        "fig9": {
+            "workdir": str(tmp_path),
+            "command": ["runner", "--dax", "{dax_path}"],
+            "dax_path": "/dev/dax0.0",
+            "iterations": 10,
+            "map_offset": map_offset,
+            "map_size": map_size,
+            "acknowledge_dax_writes": True,
+        },
+    }
+
+    with pytest.raises(ConfigError, match="approved first 2 MiB"):
+        plan_logp_command(config, tmp_path, tmp_path / "run")
+
+
 def test_collect_requires_configured_sample_count(monkeypatch, tmp_path: Path):
     records = [
-        {"type": "metadata", "rank": rank, "world_size": 2, "iterations": 2}
+        {
+            "type": "metadata",
+            "rank": rank,
+            "world_size": 2,
+            "hostname": f"vm{rank}",
+            "iterations": 2,
+        }
         for rank in (0, 1)
     ]
     records.extend(

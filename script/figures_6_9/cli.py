@@ -152,18 +152,25 @@ def _doctor(config: dict, selection: str) -> None:
             ]
             if not benchmark_tokens:
                 raise ConfigError("fig9.command does not name cxl_switch_lock_bench_mpi")
-            benchmark = Path(benchmark_tokens[0])
+            benchmark_token = benchmark_tokens[0].replace(
+                "{repo_root}", str(REPO_ROOT)
+            ).replace("{workdir}", str(workdir))
+            benchmark = Path(benchmark_token)
             benchmark = benchmark if benchmark.is_absolute() else workdir / benchmark
             if not benchmark.is_file() or not benchmark.stat().st_mode & stat.S_IXUSR:
                 problems.append(f"fig9 MPI benchmark is unavailable: {benchmark}")
-            dax = Path(str(section.get("dax_path", "")))
-            try:
-                dax_mode = dax.stat().st_mode
-            except OSError:
-                problems.append(f"fig9 DAX device is unavailable: {dax}")
-            else:
-                if not stat.S_ISCHR(dax_mode):
-                    problems.append(f"fig9 DAX path is not a character device: {dax}")
+            dax_scope = str(section.get("dax_scope", "host"))
+            if dax_scope not in {"host", "runner"}:
+                raise ConfigError("fig9.dax_scope must be 'host' or 'runner'")
+            if dax_scope == "host":
+                dax = Path(str(section.get("dax_path", "")))
+                try:
+                    dax_mode = dax.stat().st_mode
+                except OSError:
+                    problems.append(f"fig9 DAX device is unavailable: {dax}")
+                else:
+                    if not stat.S_ISCHR(dax_mode):
+                        problems.append(f"fig9 DAX path is not a character device: {dax}")
     if problems:
         raise UnavailableError("; ".join(problems))
 

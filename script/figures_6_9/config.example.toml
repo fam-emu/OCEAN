@@ -10,10 +10,10 @@ coverage_pct = [0, 25, 50, 70, 80, 90, 100]
 command = ["python3", "{repo_root}/script/figures_6_9/runners/fig6_tigon.py", "--tigon-root", "{workdir}", "--coverage", "{coverage_pct}"]
 
 [fig7]
-workdir = "workloads/tigon"
+workdir = "../../CXLMemSim/workloads/tigon"
 protocols = ["Tigon", "DS2PL+", "Sundial+"]
 write_ratio_pct = [0, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100]
-command = ["./scripts/run_figure7.sh", "--protocol", "{protocol}", "--write-ratio", "{write_ratio_pct}"]
+command = ["python3", "{repo_root}/script/figures_6_9/runners/fig7_tigon.py", "--tigon-root", "{workdir}", "--protocol", "{protocol}", "--write-ratio", "{write_ratio_pct}"]
 
 [fig8]
 workdir = "workloads/gromacs"
@@ -23,8 +23,9 @@ command = ["./run_figure8.sh", "--backend", "{backend}", "--policy", "{policy}"]
 
 [fig9]
 workdir = "."
-command = ["mpirun", "-np", "2", "--hostfile", "hostfile", "build/microbench/cxl_switch_lock_bench_mpi", "--dax", "{dax_path}", "--iterations", "{iterations}", "--map-offset", "{map_offset}", "--map-size", "{map_size}", "--acknowledge-dax-write"]
+command = ["python3", "{repo_root}/script/figures_6_9/runners/fig9_vm.py", "--binary", "{repo_root}/build/microbench/cxl_switch_lock_bench_mpi", "--dax-path", "{dax_path}", "--iterations", "{iterations}", "--map-offset", "{map_offset}", "--map-size", "{map_size}", "--acknowledge-dax-write"]
 dax_path = "/dev/dax0.0"
+dax_scope = "runner"
 iterations = 10000
 map_offset = 0
 map_size = 2097152

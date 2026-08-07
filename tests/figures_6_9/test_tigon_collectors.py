@@ -1,3 +1,4 @@
+import subprocess
 import sys
 from pathlib import Path
 
@@ -11,9 +12,16 @@ from figures_6_9.collectors.fig6_tpcc import (
 from figures_6_9.collectors.fig7_ycsb import parse_ycsb, plan_ycsb_commands
 from figures_6_9.errors import UnavailableError, ValidationError
 from figures_6_9.runners.fig6_tigon import (
+    build_detached_command,
+    build_guest_prepare_command,
     build_tpcc_argv,
     hcc_budget_bytes,
     parse_average_commit,
+    tigon_launch_order,
+)
+from figures_6_9.runners.fig7_tigon import (
+    build_ycsb_argv,
+    protocol_settings,
 )
 
 
@@ -98,7 +106,12 @@ def test_planner_expands_repository_and_workdir_placeholders(tmp_path: Path):
 
 @pytest.mark.parametrize(
     ("coverage", "expected"),
-    [(0, 0), (25, 52_428_800), (70, 146_800_640), (100, 209_715_200)],
+    [
+        (0, 1_048_576),
+        (25, 53_215_232),
+        (70, 147_115_212),
+        (100, 209_715_200),
+    ],
 )
 def test_hcc_coverage_maps_to_200_mib_budget(coverage: int, expected: int):
     assert hcc_budget_bytes(coverage) == expected
@@ -118,11 +131,11 @@ def test_parse_average_commit_rejects_missing_summary():
         parse_average_commit("commit: 100 abort: 2\n")
 
 
-def test_figure6_command_is_neworder_with_required_persistence_flags():
+def test_figure6_command_matches_original_mixed_tpcc_sweep():
     argv = build_tpcc_argv(
         node_id=1,
         servers="192.168.100.10:1234;192.168.100.11:1234",
-        budget_bytes=52_428_800,
+        budget_bytes=53_215_232,
         dax_path="/dev/dax0.0",
         workers=1,
         run_seconds=10,
@@ -131,13 +144,114 @@ def test_figure6_command_is_neworder_with_required_persistence_flags():
 
     assert argv[0] == "./bench_tpcc"
     assert "--id=1" in argv
-    assert "--query=neworder" in argv
-    assert "--hw_cc_budget=52428800" in argv
+    assert "--query=mixed" in argv
+    assert "--hw_cc_budget=53215232" in argv
     assert "--enable_scc=1" in argv
     assert "--scc_mechanism=WriteThrough" in argv
+    assert "--pre_migrate=None" in argv
     assert "--persist_latency=0" in argv
     assert "--wal_group_commit_time=0" in argv
     assert "--wal_group_commit_size=0" in argv
+
+
+def test_figure6_command_can_override_query_for_diagnostics():
+    argv = build_tpcc_argv(
+        node_id=0,
+        servers="192.168.100.10:1234;192.168.100.11:1234",
+        budget_bytes=0,
+        dax_path="/dev/dax0.0",
+        workers=1,
+        run_seconds=10,
+        warmup_seconds=2,
+        query="neworder",
+    )
+
+    assert "--query=neworder" in argv
+
+
+def test_detached_launch_uses_setsid_instead_of_waited_shell_background_job():
+    command = build_detached_command(
+        "/root/pasha",
+        "/root/pasha/fig6.log",
+        ["./bench_tpcc", "--id=0"],
+    )
+
+    assert "setsid -f" in command
+    assert "nohup" not in command
+    assert not command.rstrip().endswith("&")
+
+
+def test_guest_prepare_fails_closed_when_dax_is_not_a_character_device(
+    tmp_path: Path,
+):
+    valid = build_guest_prepare_command(
+        "/dev/null", str(tmp_path), "codex-no-proc", str(tmp_path / "logs")
+    )
+    invalid = build_guest_prepare_command(
+        str(tmp_path / "missing-dax"),
+        str(tmp_path),
+        "codex-no-proc",
+        str(tmp_path / "logs"),
+    )
+
+    assert subprocess.run(valid, shell=True, check=False).returncode == 0
+    assert subprocess.run(invalid, shell=True, check=False).returncode != 0
+
+
+def test_tigon_launches_metadata_owner_before_peer():
+    assert tigon_launch_order() == (0, 1)
+
+
+@pytest.mark.parametrize(
+    ("paper_name", "binary_protocol"),
+    [("Tigon", "TwoPLPasha"), ("DS2PL+", "TwoPL"), ("Sundial+", "Sundial")],
+)
+def test_figure7_protocol_mapping(paper_name: str, binary_protocol: str):
+    assert protocol_settings(paper_name).binary_protocol == binary_protocol
+
+
+def test_figure7_converts_write_ratio_to_tigon_read_ratio():
+    argv = build_ycsb_argv(
+        node_id=0,
+        servers="192.168.100.10:1234;192.168.100.11:1234",
+        protocol="DS2PL+",
+        write_ratio_pct=70,
+        dax_path="/dev/dax0.0",
+        workers=1,
+        run_seconds=10,
+        warmup_seconds=2,
+        entry_num=512,
+    )
+
+    assert argv[0] == "./bench_ycsb"
+    assert "--protocol=TwoPL" in argv
+    assert "--query=rmw" in argv
+    assert "--read_write_ratio=30" in argv
+    assert "--cross_ratio=100" in argv
+    assert "--use_cxl_transport=1" in argv
+    assert "--cxl_trans_entry_struct_size=65536" in argv
+    assert "--cxl_trans_entry_num=512" in argv
+    assert not any(item.startswith("--enable_scc=") for item in argv)
+
+
+def test_figure7_tigon_enables_hardware_and_software_coherence_paths():
+    argv = build_ycsb_argv(
+        node_id=1,
+        servers="192.168.100.10:1234;192.168.100.11:1234",
+        protocol="Tigon",
+        write_ratio_pct=40,
+        dax_path="/dev/dax0.0",
+        workers=1,
+        run_seconds=10,
+        warmup_seconds=2,
+    )
+
+    assert "--protocol=TwoPLPasha" in argv
+    assert "--cxl_trans_entry_struct_size=2048" in argv
+    assert "--hw_cc_budget=209715200" in argv
+    assert "--enable_scc=1" in argv
+    assert "--scc_mechanism=WriteThrough" in argv
+    assert "--pre_migrate=NonPart" in argv
 
 
 def test_planner_reports_missing_tigon_workdir(tmp_path: Path):

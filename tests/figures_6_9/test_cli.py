@@ -18,7 +18,13 @@ def test_parser_exposes_five_commands():
 def test_doctor_reports_missing_tigon_without_mutation(
     repo_root: Path, tmp_path: Path, capsys
 ):
-    config = repo_root / "script/figures_6_9/config.example.toml"
+    config = tmp_path / "missing-tigon.toml"
+    config.write_text(
+        '[run]\noutput_root="artifact/figures_6_9"\n'
+        '[fig6]\nworkdir="missing-tigon"\ncoverage_pct=[0]\n'
+        'command=["/bin/true"]\n',
+        encoding="utf-8",
+    )
     before = set(tmp_path.iterdir())
 
     rc = main(["doctor", "--fig", "6", "--config", str(config)])
@@ -71,3 +77,16 @@ def test_validate_returns_stable_invalid_exit_for_missing_table(
 
     assert rc == EXIT_INVALID
     assert "cannot read fig6 table" in capsys.readouterr().err
+
+
+def test_doctor_accepts_runner_managed_remote_dax(repo_root: Path, tmp_path: Path):
+    config = tmp_path / "remote-dax.toml"
+    config.write_text(
+        '[run]\noutput_root="artifact/figures_6_9"\n'
+        f'[fig9]\nworkdir="{repo_root}"\n'
+        'command=["python3", "runner.py", "{repo_root}/build/microbench/cxl_switch_lock_bench_mpi"]\n'
+        'dax_path="/dev/dax0.0"\ndax_scope="runner"\n',
+        encoding="utf-8",
+    )
+
+    assert main(["doctor", "--fig", "9", "--config", str(config)]) == EXIT_OK

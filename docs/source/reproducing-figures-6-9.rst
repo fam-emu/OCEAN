@@ -22,6 +22,19 @@ Figures 6 and 7 require the external Tigon tree. Figure 8 requires a working
 PEPSIN/GROMACS runner for every backend and policy. The committed GROMACS logs
 are not accepted as measurements because they contain fatal or zero-thread runs.
 
+The example configuration uses the installed sibling
+``../../CXLMemSim/workloads/tigon`` tree through the Python adapters in
+``script/figures_6_9/runners``. The adapters synchronize the exact local Tigon
+binary into two VMs and retain both node summaries. The metadata-owning node is
+launched first and must publish fresh CXL transport metadata before the peer
+starts, matching Tigon's raw-DAX
+runner and preventing stale offsets between sweep points. Figure 7 uses Tigon's
+2,048-byte transport entries for ``TwoPLPasha`` and its 65,536-byte baseline
+entries for ``TwoPL`` and ``Sundial``. Tigon's HCC-budget script uses the
+``mixed`` TPC-C query;
+therefore the collected ``average commit`` metric is the aggregate TPC-C commit
+rate used by that script even though Figure 6 labels the axis NewOrder.
+
 Figure 9 requires MPI on two hosts that map the same real CXL Type-3 DAX range.
 Build its optional target with:
 
@@ -37,6 +50,9 @@ binary executes. Hardware collection refuses to open DAX until
 ``--acknowledge-dax-write``. It maps only the configured, page-aligned
 ``[map_offset, map_offset + map_size)`` byte range. It never creates, formats,
 resizes, or mounts a DAX device, but it *does write* inside that mapped range.
+For DAX devices owned by a VM runner, set ``fig9.dax_scope = "runner"``. In
+that mode ``doctor`` validates the local benchmark and delegates the character
+device check to the runner immediately before execution.
 
 Collect and reproduce
 ---------------------

@@ -113,10 +113,14 @@ static inline bool compare_exchange(volatile uint64_t *address, uint64_t expecte
 }
 
 static void emit_metadata(int rank, int world_size, const struct options *options) {
+    char hostname[256] = {0};
+    if (gethostname(hostname, sizeof(hostname) - 1u) != 0) {
+        snprintf(hostname, sizeof(hostname), "hostname-error-%d", errno);
+    }
     printf("{\"type\":\"metadata\",\"version\":1,\"rank\":%d,"
-           "\"world_size\":%d,\"iterations\":%" PRIu64 ","
+           "\"world_size\":%d,\"hostname\":\"%s\",\"iterations\":%" PRIu64 ","
            "\"dax_path\":\"%s\",\"map_offset\":%lld,\"map_size\":%zu}\n",
-           rank, world_size, options->iterations,
+           rank, world_size, hostname, options->iterations,
            options->self_test ? "anonymous-self-test" : options->dax_path,
            (long long)options->map_offset, options->map_size);
     fflush(stdout);

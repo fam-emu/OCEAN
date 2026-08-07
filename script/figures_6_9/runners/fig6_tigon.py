@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Run one two-node Tigon TPC-C NewOrder point for Figure 6."""
+"""Run one two-node Tigon TPC-C point for Figure 6."""
 
 from __future__ import annotations
 
@@ -21,18 +21,28 @@ from figures_6_9.errors import ReproductionError, ValidationError
 
 
 MAX_HCC_BYTES = 200 * 1024 * 1024
+EBR_RESERVE_BYTES = 1 * 1024 * 1024
 AVERAGE_COMMIT = re.compile(
     r"(?:^|\n).*?average commit:\s*(?P<throughput>[0-9]+(?:\.[0-9]+)?)",
     re.IGNORECASE,
 )
 
 
-def hcc_budget_bytes(coverage_pct: int, maximum: int = MAX_HCC_BYTES) -> int:
+def hcc_budget_bytes(
+    coverage_pct: int,
+    maximum: int = MAX_HCC_BYTES,
+    reserve: int = EBR_RESERVE_BYTES,
+) -> int:
     if coverage_pct < 0 or coverage_pct > 100:
         raise ValidationError("fig6: coverage must be between 0 and 100")
-    if maximum <= 0:
-        raise ValidationError("fig6: maximum HCC budget must be positive")
-    return maximum * coverage_pct // 100
+    if maximum <= reserve or reserve < 0:
+        raise ValidationError("fig6: maximum HCC budget must exceed the EBR reserve")
+    return reserve + (maximum - reserve) * coverage_pct // 100
+
+
+def tigon_launch_order() -> tuple[int, int]:
+    """Match Tigon's owner-first shared-metadata initialization contract."""
+    return (0, 1)
 
 
 def parse_average_commit(text: str) -> float:
@@ -56,7 +66,10 @@ def build_tpcc_argv(
     workers: int,
     run_seconds: int,
     warmup_seconds: int,
+    query: str = "mixed",
 ) -> list[str]:
+    if query not in {"mixed", "neworder", "payment", "first_two", "test"}:
+        raise ValidationError(f"fig6: unsupported TPC-C query mode: {query}")
     partitions = 2 * workers
     return [
         "./bench_tpcc",
@@ -66,7 +79,7 @@ def build_tpcc_argv(
         f"--threads={workers}",
         f"--partition_num={partitions}",
         "--protocol=TwoPLPasha",
-        "--query=neworder",
+        f"--query={query}",
         "--neworder_dist=10",
         "--payment_dist=15",
         "--cxl_backend=dax",
@@ -165,9 +178,15 @@ def _sha256(path: Path) -> str:
     return digest.hexdigest()
 
 
-def _sync_binary(remote: Remote, host: str, local_binary: Path, guest_workdir: str) -> None:
+def sync_binary(
+    remote: Remote,
+    host: str,
+    local_binary: Path,
+    guest_workdir: str,
+    binary_name: str = "bench_tpcc",
+) -> None:
     local_hash = _sha256(local_binary)
-    guest_binary = f"{guest_workdir}/bench_tpcc"
+    guest_binary = f"{guest_workdir}/{binary_name}"
     check = remote.run(
         host,
         f"sha256sum {shlex.quote(guest_binary)} 2>/dev/null | cut -d' ' -f1",
@@ -184,7 +203,37 @@ def _sync_binary(remote: Remote, host: str, local_binary: Path, guest_workdir: s
     )
     verify = remote.run(host, f"sha256sum {shlex.quote(guest_binary)} | cut -d' ' -f1")
     if verify.stdout.strip() != local_hash:
-        raise ReproductionError(f"fig6: Tigon binary hash mismatch on {host}")
+        raise ReproductionError(f"Tigon {binary_name} hash mismatch on {host}")
+
+
+def build_detached_command(
+    guest_workdir: str,
+    output_path: str,
+    argv: list[str],
+) -> str:
+    tunables = "glibc.cpu.hwcaps=-AVX,-AVX2,-AVX512F,-AVX_Fast_Unaligned_Load"
+    child = (
+        f"exec env GLIBC_TUNABLES={shlex.quote(tunables)} {shlex.join(argv)} "
+        f"> {shlex.quote(output_path)} 2>&1 < /dev/null"
+    )
+    return (
+        f"cd {shlex.quote(guest_workdir)} && "
+        f"rm -f {shlex.quote(output_path)} && "
+        f"setsid -f sh -c {shlex.quote(child)}"
+    )
+
+
+def build_guest_prepare_command(
+    dax_path: str,
+    guest_workdir: str,
+    process_name: str,
+    log_path: str = "/root/pasha_log",
+) -> str:
+    return (
+        f"test -c {shlex.quote(dax_path)} && "
+        f"mkdir -p {shlex.quote(guest_workdir)} {shlex.quote(log_path)} && "
+        f"{{ pkill -9 {shlex.quote(process_name)} 2>/dev/null || true; }}"
+    )
 
 
 def _launch(
@@ -194,14 +243,7 @@ def _launch(
     output_path: str,
     argv: list[str],
 ) -> None:
-    tunables = "glibc.cpu.hwcaps=-AVX,-AVX2,-AVX512F,-AVX_Fast_Unaligned_Load"
-    command = (
-        f"cd {shlex.quote(guest_workdir)} && "
-        f"rm -f {shlex.quote(output_path)} && "
-        f"nohup env GLIBC_TUNABLES={shlex.quote(tunables)} {shlex.join(argv)} "
-        f"> {shlex.quote(output_path)} 2>&1 < /dev/null &"
-    )
-    remote.run(host, command)
+    remote.run(host, build_detached_command(guest_workdir, output_path, argv))
 
 
 def _wait_for_marker(
@@ -212,12 +254,19 @@ def _wait_for_marker(
     process_name: str,
     timeout_s: int,
     poll_s: float,
+    reject_markers: tuple[str, ...] = (),
 ) -> str:
     deadline = time.monotonic() + timeout_s
     latest = ""
     while time.monotonic() < deadline:
         result = remote.run(host, f"cat {shlex.quote(output_path)} 2>/dev/null", check=False)
         latest = result.stdout
+        for rejected in reject_markers:
+            if rejected in latest:
+                raise ReproductionError(
+                    f"fig6: {process_name} entered forbidden fallback on {host}: "
+                    f"{rejected!r}\n{latest[-4000:]}"
+                )
         if marker in latest:
             return latest
         alive = remote.run(host, f"pgrep -x {shlex.quote(process_name)}", check=False)
@@ -255,11 +304,11 @@ def run(args: argparse.Namespace) -> None:
             remote.run(host, "true")
             remote.run(
                 host,
-                f"test -c {shlex.quote(args.dax_path)} && "
-                f"mkdir -p {shlex.quote(args.guest_workdir)} /root/pasha_log && "
-                "pkill -9 bench_tpcc 2>/dev/null || true",
+                build_guest_prepare_command(
+                    args.dax_path, args.guest_workdir, "bench_tpcc"
+                ),
             )
-            _sync_binary(remote, host, local_binary, args.guest_workdir)
+            sync_binary(remote, host, local_binary, args.guest_workdir)
 
         argv0 = build_tpcc_argv(
             node_id=0,
@@ -269,18 +318,8 @@ def run(args: argparse.Namespace) -> None:
             workers=args.workers,
             run_seconds=args.run_seconds,
             warmup_seconds=args.warmup_seconds,
+            query=args.query,
         )
-        _launch(remote, args.node0, args.guest_workdir, output_paths[0], argv0)
-        _wait_for_marker(
-            remote,
-            args.node0,
-            output_paths[0],
-            "initializes CXL transport metadata",
-            "bench_tpcc",
-            args.init_timeout,
-            args.poll_interval,
-        )
-
         argv1 = build_tpcc_argv(
             node_id=1,
             servers=servers,
@@ -289,8 +328,47 @@ def run(args: argparse.Namespace) -> None:
             workers=args.workers,
             run_seconds=args.run_seconds,
             warmup_seconds=args.warmup_seconds,
+            query=args.query,
         )
-        _launch(remote, args.node1, args.guest_workdir, output_paths[1], argv1)
+        host_by_node = dict(nodes)
+        argv_by_node = {0: argv0, 1: argv1}
+        owner_id, peer_id = tigon_launch_order()
+        _launch(
+            remote,
+            host_by_node[owner_id],
+            args.guest_workdir,
+            output_paths[owner_id],
+            argv_by_node[owner_id],
+        )
+        _wait_for_marker(
+            remote,
+            host_by_node[owner_id],
+            output_paths[owner_id],
+            "initializes CXL transport metadata",
+            "bench_tpcc",
+            args.init_timeout,
+            args.poll_interval,
+        )
+        _launch(
+            remote,
+            host_by_node[peer_id],
+            args.guest_workdir,
+            output_paths[peer_id],
+            argv_by_node[peer_id],
+        )
+        _wait_for_marker(
+            remote,
+            host_by_node[peer_id],
+            output_paths[peer_id],
+            "retrives CXL transport metadata",
+            "bench_tpcc",
+            args.init_timeout,
+            args.poll_interval,
+            reject_markers=(
+                "CXL shared memory not available",
+                "initialized local CXL transport metadata",
+            ),
+        )
 
         outputs = {}
         for node_id, host in nodes:
@@ -322,12 +400,18 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--node1", default="192.168.100.11")
     parser.add_argument("--ssh-user", default="root")
     parser.add_argument("--ssh-port", type=int, default=22)
-    parser.add_argument("--ssh-timeout", type=int, default=60)
+    parser.add_argument("--ssh-timeout", type=int, default=300)
     parser.add_argument("--guest-workdir", default="/root/pasha")
     parser.add_argument("--dax-path", default="/dev/dax0.0")
     parser.add_argument("--workers", type=int, default=1)
     parser.add_argument("--run-seconds", type=int, default=10)
     parser.add_argument("--warmup-seconds", type=int, default=2)
+    parser.add_argument(
+        "--query",
+        choices=("mixed", "neworder", "payment", "first_two", "test"),
+        default="mixed",
+        help="TPC-C mix; mixed matches Tigon scripts/run_hwcc_budget.sh",
+    )
     parser.add_argument("--max-hcc-bytes", type=int, default=MAX_HCC_BYTES)
     parser.add_argument("--init-timeout", type=int, default=240)
     parser.add_argument("--done-timeout", type=int, default=180)

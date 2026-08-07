@@ -11,6 +11,9 @@ from ..execution import RunResult
 from .common import PlannedRun, execute_plan, make_plan
 
 
+APPROVED_DAX_BYTES = 2 * 1024 * 1024
+
+
 @dataclass(frozen=True)
 class ParsedLogP:
     samples: list[dict[str, object]]
@@ -134,8 +137,14 @@ def plan_logp_command(
         "map_offset": int(section["map_offset"]),
         "map_size": int(section["map_size"]),
     }
-    if values["map_offset"] < 0 or values["map_size"] <= 0:
-        raise ConfigError("fig9 map_offset/map_size define an invalid DAX range")
+    if (
+        values["map_offset"] != 0
+        or values["map_size"] <= 0
+        or values["map_size"] > APPROVED_DAX_BYTES
+    ):
+        raise ConfigError(
+            "fig9 DAX writes must stay within the approved first 2 MiB at offset 0"
+        )
     return make_plan(
         "fig9",
         section,
@@ -197,6 +206,9 @@ def collect_logp(
         for item in parsed.metadata
     ):
         raise ValidationError("fig9: inconsistent two-rank benchmark metadata")
+    hostnames = {str(item.get("hostname", "")) for item in parsed.metadata}
+    if "" in hostnames or len(hostnames) != 2:
+        raise ValidationError("fig9: metadata from two distinct hosts is required")
     contention_locks = {int(row["lock_count"]) for row in parsed.contention}
     if contention_locks != {1, 2, 4, 8}:
         raise ValidationError(

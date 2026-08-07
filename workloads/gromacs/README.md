@@ -131,6 +131,52 @@ This shim layer integrates with the CXLMemSim framework:
 - Compatible with CXLMemSim's shared memory mode
 - Can be monitored using CXLMemSim's performance tracking tools
 
+## Reproducing OCEAN Figure 8
+
+`run_figure8.sh` is the per-cell runner used by the repository's Figures 6--9
+workflow. The collector calls it for SHM and TCP across the thirteen policy
+labels shown in the paper. The runner maps each label to the corresponding
+allocation, migration, paging, and caching policy tuple for
+`cxlmemsim_legacy`.
+
+The current GROMACS shim has a shared-memory fallback but no TCP client, while
+the current server does not expose the legacy four-slot policy interface.
+Therefore, the runner deliberately requires separate executable backend
+adapters instead of silently generating two identically configured series.
+Each adapter must select or connect to the real backend and execute everything
+after `--` without changing its argument boundaries:
+
+```bash
+export FIG8_CXLMEMSIM=/path/to/cxlmemsim_legacy
+export FIG8_GMX_MPI=/path/to/gmx_mpi
+export FIG8_TPR=/path/to/benchMEM.tpr
+export FIG8_SHM_LAUNCHER=/path/to/launch-figure8-shm
+export FIG8_TCP_LAUNCHER=/path/to/launch-figure8-tcp
+```
+
+Optional controls are `FIG8_STEPS` (default `10000`), `FIG8_NTOMP` (default
+`1`), `FIG8_CPUSET` (default `0`), and `FIG8_PEBS_PERIOD` (default `1000`). A
+backend adapter receives this interface:
+
+```text
+launch-figure8-shm -- cxlmemsim_legacy -c ... -p ... -k ... -t ...
+```
+
+From the OCEAN repository root, run the full collection, validation, and plot
+pipeline with a unique run ID:
+
+```bash
+python3 script/reproduce_figures_6_9.py all \
+  --fig 8 \
+  --config script/figures_6_9/config.example.toml \
+  --run-id figure8-live
+```
+
+The default config writes raw logs, `normalized/fig8.csv`, `manifest.json`, and
+Figure 8 PDF/PNG plots below `artifact/figures_6_9/figure8-live/`. The runner
+fails when a selected adapter or measurement input is absent and never fills
+missing cells from paper-digitized, historical, or synthetic values.
+
 ## Limitations
 
 - Currently supports OpenMPI; may need adjustments for MPICH or Intel MPI

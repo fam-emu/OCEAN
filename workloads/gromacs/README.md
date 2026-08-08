@@ -154,6 +154,11 @@ export FIG8_SHM_LAUNCHER=/path/to/launch-figure8-shm
 export FIG8_TCP_LAUNCHER=/path/to/launch-figure8-tcp
 ```
 
+The SHM and TCP variables must resolve to distinct executables. The runner
+forwards their output and exit status verbatim; it does not create a GROMACS
+completion marker. Validation accepts GROMACS's native `Finished mdrun` or
+`Performance:` marker together with a positive wall time.
+
 Optional controls are `FIG8_STEPS` (default `10000`), `FIG8_NTOMP` (default
 `1`), `FIG8_CPUSET` (default `0`), and `FIG8_PEBS_PERIOD` (default `1000`). A
 backend adapter receives this interface:

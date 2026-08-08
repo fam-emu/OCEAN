@@ -33,6 +33,18 @@ def test_parse_standard_gromacs_time_table():
     assert row["elapsed_s"] == 1.05
 
 
+def test_parse_native_gromacs_performance_completion():
+    text = (
+        "starting mdrun 'PEPSIN in water'\n"
+        "Time: 4.200 1.050 400.0\n"
+        "Performance: 2.814 8.529\n"
+    )
+
+    row = parse_gromacs(text, "SHM", "Baseline", 0, "measured")
+
+    assert row["elapsed_s"] == 1.05
+
+
 @pytest.mark.parametrize(
     "name",
     [

@@ -76,9 +76,11 @@ Build the outer array as:
 <cxlmemsim> -c <cpuset> -p <period> -k <tuple> -t <target-string>
 ```
 
-Invoke only the selected backend adapter as `<launcher> -- <outer-array>`.
-Print backend/policy/tuple provenance before execution and print
-`Finished mdrun` only after a zero adapter exit.
+Require SHM and TCP adapters to resolve to distinct executables, invoke only the
+selected adapter as `<launcher> -- <outer-array>`, and print
+backend/policy/tuple provenance before execution. Forward the adapter's output
+and status without synthesizing a GROMACS completion marker; the collector
+accepts native `Finished mdrun` or `Performance:` completion evidence.
 
 - [ ] **Step 4: Verify GREEN without running a workload**
 
@@ -127,4 +129,3 @@ git status --short
 
 Commit only the runner, its tests, its README update, and this implementation
 plan. Do not stage outer-repository artifacts or unrelated changes.
-

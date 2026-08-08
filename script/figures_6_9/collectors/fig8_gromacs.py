@@ -19,6 +19,7 @@ TIME_TABLE = re.compile(
     r"^\s*Time:\s+[0-9.]+\s+(?P<seconds>[0-9.]+)(?:\s+[0-9.]+)?\s*$",
     re.MULTILINE,
 )
+COMPLETION_MARKERS = ("Finished mdrun", "Performance:")
 
 
 def parse_gromacs(
@@ -32,7 +33,7 @@ def parse_gromacs(
         raise ValidationError("fig8: fatal marker in GROMACS output")
     if "Number of Threads created: 0" in text:
         raise ValidationError("fig8: zero-work simulator run")
-    if "Finished mdrun" not in text:
+    if not any(marker in text for marker in COMPLETION_MARKERS):
         raise ValidationError("fig8: missing GROMACS completion marker")
     match = WALL_TIME.search(text) or TIME_TABLE.search(text)
     if not match:

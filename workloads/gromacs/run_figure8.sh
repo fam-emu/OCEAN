@@ -79,14 +79,18 @@ done
 [[ -n "$backend" ]] || die "--backend is required"
 [[ -n "$policy" ]] || die "--policy is required"
 
+shm_launcher="${FIG8_SHM_LAUNCHER:-}"
+tcp_launcher="${FIG8_TCP_LAUNCHER:-}"
+require_executable "FIG8_SHM_LAUNCHER" "$shm_launcher"
+require_executable "FIG8_TCP_LAUNCHER" "$tcp_launcher"
+[[ ! "$shm_launcher" -ef "$tcp_launcher" ]] || die "FIG8_SHM_LAUNCHER and FIG8_TCP_LAUNCHER must be distinct executables"
+
 case "$backend" in
     SHM)
-        launcher_name="FIG8_SHM_LAUNCHER"
-        launcher="${FIG8_SHM_LAUNCHER:-}"
+        launcher="$shm_launcher"
         ;;
     TCP)
-        launcher_name="FIG8_TCP_LAUNCHER"
-        launcher="${FIG8_TCP_LAUNCHER:-}"
+        launcher="$tcp_launcher"
         ;;
     *)
         die "unsupported Figure 8 backend: $backend"
@@ -123,7 +127,6 @@ pebs_period="${FIG8_PEBS_PERIOD:-1000}"
 target_home="${FIG8_TARGET_HOME:-${HOME:-/root}}"
 target_path="${FIG8_TARGET_PATH:-${PATH:-/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin}}"
 
-require_executable "$launcher_name" "$launcher"
 require_executable "FIG8_CXLMEMSIM" "$cxlmemsim"
 require_executable "FIG8_GMX_MPI" "$gmx_mpi"
 [[ -r "$tpr" ]] || die "FIG8_TPR must name a readable file: $tpr"
@@ -171,4 +174,3 @@ printf 'FIG8_POLICY_TUPLE=%s\n' "$policy_tuple"
 printf 'FIG8_BACKEND_LAUNCHER=%s\n' "$launcher"
 
 "$launcher" -- "${command[@]}"
-printf 'Finished mdrun\n'

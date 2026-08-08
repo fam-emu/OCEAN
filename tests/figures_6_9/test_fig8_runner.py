@@ -101,7 +101,7 @@ def test_maps_all_paper_policy_labels(
     assert f"FIG8_POLICY={label}" in result.stdout
     assert f"FIG8_POLICY_TUPLE={policy_tuple}" in result.stdout
     assert f"ARG=-k\nARG={policy_tuple}\n" in result.stdout
-    assert result.stdout.rstrip().endswith("Finished mdrun")
+    assert "Finished mdrun" not in result.stdout
 
 
 @pytest.mark.parametrize(
@@ -195,6 +195,98 @@ def test_requires_selected_backend_launcher(
 
     assert result.returncode != 0
     assert "FIG8_TCP_LAUNCHER" in result.stderr
+
+
+def test_rejects_same_launcher_for_shm_and_tcp(
+    runner: Path,
+    fake_environment: dict[str, str],
+):
+    result = _run(
+        runner,
+        fake_environment
+        | {"FIG8_TCP_LAUNCHER": fake_environment["FIG8_SHM_LAUNCHER"]},
+        "--backend",
+        "SHM",
+        "--policy",
+        "Baseline",
+    )
+
+    assert result.returncode != 0
+    assert "distinct executables" in result.stderr
+
+
+def test_passes_complete_target_as_one_argument(
+    runner: Path,
+    fake_environment: dict[str, str],
+):
+    result = _run(
+        runner,
+        fake_environment,
+        "--backend",
+        "TCP",
+        "--policy",
+        "Frequency",
+    )
+
+    lines = result.stdout.splitlines()
+    separator_index = lines.index("ARG=--")
+    assert lines[separator_index + 1] == f"ARG={fake_environment['FIG8_CXLMEMSIM']}"
+    target_index = lines.index("ARG=-t") + 1
+    target = lines[target_index]
+    assert target.startswith("ARG=/usr/bin/env OMP_NUM_THREADS=1 HOME=")
+    assert f" {fake_environment['FIG8_GMX_MPI']} mdrun " in target
+    assert f"-s {fake_environment['FIG8_TPR']}" in target
+    assert "-nsteps 10000 -resethway -ntomp 1 -noconfout -noappend" in target
+    assert sum(line == "ARG=-t" for line in lines) == 1
+
+
+@pytest.mark.parametrize(
+    ("name", "value", "message"),
+    (
+        ("FIG8_CXLMEMSIM", "/missing/cxlmemsim", "FIG8_CXLMEMSIM"),
+        ("FIG8_GMX_MPI", "/missing/gmx", "FIG8_GMX_MPI"),
+        ("FIG8_TPR", "/missing/input.tpr", "FIG8_TPR"),
+    ),
+)
+def test_rejects_missing_tool_or_input(
+    runner: Path,
+    fake_environment: dict[str, str],
+    name: str,
+    value: str,
+    message: str,
+):
+    result = _run(
+        runner,
+        fake_environment,
+        "--backend",
+        "SHM",
+        "--policy",
+        "Baseline",
+        env_updates={name: value},
+    )
+
+    assert result.returncode != 0
+    assert message in result.stderr
+
+
+def test_rejects_whitespace_in_legacy_target_path(
+    runner: Path,
+    fake_environment: dict[str, str],
+    tmp_path: Path,
+):
+    spaced_gmx = _write_executable(tmp_path / "gmx mpi", "#!/bin/sh\nexit 0\n")
+    result = _run(
+        runner,
+        fake_environment,
+        "--backend",
+        "SHM",
+        "--policy",
+        "Baseline",
+        env_updates={"FIG8_GMX_MPI": str(spaced_gmx)},
+    )
+
+    assert result.returncode != 0
+    assert "cannot contain whitespace" in result.stderr
 
 
 def test_propagates_backend_launcher_failure(

@@ -1,0 +1,1 @@
+"""Reconstructed-image workload adapters."""

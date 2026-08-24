@@ -15,6 +15,7 @@
 #include "distributed_server.h"
 #include "helper.h"
 #include "monitor.h"
+#include "pgas_poll_policy.h"
 #include "policy.h"
 #include "shm_communication.h"
 #include <algorithm>
@@ -22,15 +23,18 @@
 #include <atomic>
 #include <cerrno>
 #include <chrono>
+#include <cstdlib>
 #include <cstring>
 #include <cxxopts.hpp>
 #include <errno.h>
+#include <fcntl.h>
 #include <format>
 #include <fstream>
 #include <iostream>
 #include <memory>
 #include <mutex>
 #include <netinet/in.h>
+#include <netinet/tcp.h>
 #include <shared_mutex>
 #include <signal.h>
 #include <spdlog/cfg/env.h>
@@ -38,6 +42,7 @@
 #include <sstream>
 #include <sys/mman.h> // For msync
 #include <sys/socket.h>
+#include <sys/stat.h>
 #include <thread>
 #include <unistd.h>
 #include <vector>
@@ -60,6 +65,31 @@ constexpr uint8_t OP_ATOMIC_CAS = 4;   // Compare-and-Swap
 constexpr uint8_t OP_FENCE = 5;        // Memory fence
 constexpr uint8_t OP_LSA_READ = 6;     // Label Storage Area read
 constexpr uint8_t OP_LSA_WRITE = 7;    // Label Storage Area write
+constexpr uint8_t OP_GET_LSA_INFO = 15; // Query LSA capacity
+constexpr uint8_t OP_ZERO_RANGE = 14;  // Bulk provisioning zero
+// 8-13 are reserved by QEMU's CXLMemSim integration for DCD/GFAM requests.
+
+// Wire-protocol data buffer size. MUST match CXL_MEMSIM_DATA_SIZE in
+// lib/qemu/hw/mem/cxl_type3.c: every op transfers fixed-size request/response,
+// so a mismatch desyncs the stream and deadlocks the client (under the BQL).
+// Sized for a full mailbox LSA payload (CXL_MAILBOX_MAX_PAYLOAD_SIZE, 2048).
+#define CXL_MEMSIM_DATA_SIZE 2048
+
+const char* debug_op_name(uint8_t op_type) {
+    switch (op_type) {
+    case OP_READ: return "READ";
+    case OP_WRITE: return "WRITE";
+    case OP_GET_SHM_INFO: return "GET_SHM_INFO";
+    case OP_ATOMIC_FAA: return "FAA";
+    case OP_ATOMIC_CAS: return "CAS";
+    case OP_FENCE: return "FENCE";
+    case OP_LSA_READ: return "LSA_READ";
+    case OP_LSA_WRITE: return "LSA_WRITE";
+    case OP_GET_LSA_INFO: return "GET_LSA_INFO";
+    case OP_ZERO_RANGE: return "ZERO_RANGE";
+    default: return "UNKNOWN";
+    }
+}
 
 // Server request/response structures (matching qemu_integration)
 struct __attribute__((packed)) ServerRequest {
@@ -69,14 +99,14 @@ struct __attribute__((packed)) ServerRequest {
     uint64_t timestamp;
     uint64_t value;       // Value for FAA (add value) or CAS (desired value)
     uint64_t expected;    // Expected value for CAS operation
-    uint8_t data[64];     // Cacheline data
+    uint8_t data[CXL_MEMSIM_DATA_SIZE];     // Cacheline data
 };
 
 struct __attribute__((packed)) ServerResponse {
     uint8_t status;
     uint64_t latency_ns;
     uint64_t old_value;   // Previous value returned by atomic operations
-    uint8_t data[64];
+    uint8_t data[CXL_MEMSIM_DATA_SIZE];
 };
 
 // Extended response for shared memory info
@@ -127,6 +157,7 @@ private:
     cxl_shm_header_t* pgas_shm_header_;
     void* pgas_memory_;
     size_t pgas_memory_size_;
+    PgasPollConfig pgas_poll_config_;
 
     // Shared memory manager for real memory allocation
     std::unique_ptr<SharedMemoryManager> shm_manager;
@@ -164,20 +195,32 @@ private:
     std::atomic<uint64_t> coherency_downgrades{0};
     std::atomic<uint64_t> back_invalidations{0};
 
+    // Set CXL_MEMSIM_DEBUG_REQUESTS=N to trace the first N requests at the
+    // transport boundary without flooding logs during normal operation.
+    uint64_t debug_request_limit_ = 0;
+    std::atomic<uint64_t> debug_requests_seen_{0};
+
     // LSA (Label Storage Area) - shared across all QEMU guests
     std::vector<uint8_t> lsa_data_;
     size_t lsa_size_;
     std::mutex lsa_mutex_;
+    // With a backing file, lsa_ptr_ mmaps it (MAP_SHARED) so labels persist
+    // across restarts and match CXLMemSim's LSA memdev. Otherwise it aliases
+    // lsa_data_ (private, non-persistent).
+    uint8_t* lsa_ptr_ = nullptr;
+    int lsa_fd_ = -1;
+    bool lsa_mmap_backed_ = false;
+    bool lsa_contract_valid_ = true;
 
     // Periodic logging interval
     static constexpr uint64_t LOG_INTERVAL = 100000;
 
     // Helper to log stats periodically
-    void log_periodic_stats(const char* op_type, uint64_t count) {
-        if (count % LOG_INTERVAL == 0) {
-            uint64_t total_ops = total_reads + total_writes + total_atomic_faa +
-                                total_atomic_cas + total_fences;
-            SPDLOG_INFO("=== Stats @ {} {} ops ===", count, op_type);
+    void log_periodic_stats(const char* op_type, [[maybe_unused]] uint64_t count) {
+        uint64_t total_ops = total_reads + total_writes + total_atomic_faa +
+                             total_atomic_cas + total_fences;
+        if (total_ops != 0 && total_ops % LOG_INTERVAL == 0) {
+            SPDLOG_INFO("=== Stats @ {} cumulative ops (after {}) ===", total_ops, op_type);
             SPDLOG_INFO("  Total operations: {}", total_ops);
             SPDLOG_INFO("  Reads: {}, Writes: {}", total_reads.load(), total_writes.load());
             SPDLOG_INFO("  Atomics: FAA={}, CAS={} (success={}), Fences={}",
@@ -192,14 +235,32 @@ private:
 public:
     ThreadPerConnectionServer(int port, CXLController* ctrl, size_t capacity_mb,
                             const std::string& backing_file = "", CommMode mode = CommMode::TCP,
-                            const std::string& pgas_shm_name = "/cxlmemsim_pgas")
+                            const std::string& pgas_shm_name = "/cxlmemsim_pgas",
+                            const PgasPollConfig& pgas_poll_config = {},
+                            const std::string& lsa_backing_file = "")
         : port(port), controller(ctrl), running(true), next_thread_id(0),
-          backing_file_(backing_file), comm_mode(mode),
-          pgas_shm_name_(pgas_shm_name), pgas_shm_fd_(-1),
-          pgas_shm_header_(nullptr), pgas_memory_(nullptr), pgas_memory_size_(0) {
+          comm_mode(mode), pgas_shm_name_(pgas_shm_name), pgas_shm_fd_(-1),
+          pgas_shm_header_(nullptr), pgas_memory_(nullptr), pgas_memory_size_(0),
+          pgas_poll_config_(pgas_poll_config), backing_file_(backing_file) {
+        if (comm_mode == CommMode::TCP && lsa_backing_file.empty()) {
+            SPDLOG_ERROR("TCP mode requires --lsa-backing-file; refusing a private 256 KiB LSA");
+            lsa_contract_valid_ = false;
+        }
         congestion_info.active_requests = 0;
         congestion_info.total_bandwidth_used = 0;
         congestion_info.last_reset = std::chrono::steady_clock::now();
+
+        if (const char* value = std::getenv("CXL_MEMSIM_DEBUG_REQUESTS")) {
+            char* end = nullptr;
+            unsigned long long parsed = std::strtoull(value, &end, 10);
+            if (end != value && *end == '\0') {
+                debug_request_limit_ = parsed;
+                SPDLOG_INFO("Transport request tracing enabled for first {} requests",
+                            debug_request_limit_);
+            } else {
+                SPDLOG_WARN("Ignoring invalid CXL_MEMSIM_DEBUG_REQUESTS={}", value);
+            }
+        }
 
         // Initialize shared memory manager
         if (!backing_file_.empty()) {
@@ -209,12 +270,84 @@ public:
             shm_manager = std::make_unique<SharedMemoryManager>(capacity_mb);
         }
 
-        // Initialize LSA storage (256KB default per CXL spec)
-        lsa_size_ = 256 * 1024;
-        lsa_data_.resize(lsa_size_, 0);
-        SPDLOG_INFO("LSA initialized: {} bytes", lsa_size_);
+        // Initialize LSA storage. A backing file is mmap'd so label state is
+        // persistent and shared with QEMU's cxl-lsa memdev (otherwise the guest
+        // sees two disconnected LSA stores depending on the active backend).
+        if (!lsa_backing_file.empty()) {
+            lsa_fd_ = open(lsa_backing_file.c_str(), O_RDWR | O_CREAT, 0666);
+            if (lsa_fd_ < 0) {
+                SPDLOG_ERROR("Failed to open LSA backing file {}: {}",
+                             lsa_backing_file, strerror(errno));
+            } else {
+                struct stat st;
+                if (fstat(lsa_fd_, &st) != 0) {
+                    SPDLOG_ERROR("Failed to stat LSA backing file {}: {}",
+                                 lsa_backing_file, strerror(errno));
+                    close(lsa_fd_);
+                    lsa_fd_ = -1;
+                } else {
+                    // Size the LSA to a fixed 256 KiB, matching the cxl-lsa1
+                    // memory-backend-file (size=256K / CXL_LSA_SIZE) in
+                    // launch_qemu_cxl*.sh. QEMU maps exactly its configured size,
+                    // so the server must use that same size -- not std::max with
+                    // a possibly-stale larger file -- or the two disagree and the
+                    // fixed-size wire records desync. 256 KiB holds ~1024 label
+                    // slots (far more than any real namespace count) while making
+                    // the guest's boot-time label sweep tiny. ftruncate down is
+                    // safe here: labels live at the start of the area, so a stale
+                    // larger file keeps its index/labels and only drops the empty
+                    // tail. (st is still populated by fstat above as an fd check.)
+                    constexpr size_t kDefaultLsaSize = 256UL * 1024;
+                    size_t size = kDefaultLsaSize;
+                    if (ftruncate(lsa_fd_, size) != 0) {
+                        SPDLOG_ERROR("Failed to size LSA backing file {} to {} bytes: {}",
+                                     lsa_backing_file, size, strerror(errno));
+                        close(lsa_fd_);
+                        lsa_fd_ = -1;
+                    } else {
+                        void* m = mmap(nullptr, size, PROT_READ | PROT_WRITE,
+                                       MAP_SHARED, lsa_fd_, 0);
+                        if (m == MAP_FAILED) {
+                            SPDLOG_ERROR("Failed to mmap LSA backing file {}: {}",
+                                         lsa_backing_file, strerror(errno));
+                            close(lsa_fd_);
+                            lsa_fd_ = -1;
+                        } else {
+                            lsa_ptr_ = static_cast<uint8_t*>(m);
+                            lsa_size_ = size;
+                            lsa_mmap_backed_ = true;
+                            SPDLOG_INFO("LSA backed by file {} ({} bytes), persistent/shared",
+                                       lsa_backing_file, lsa_size_);
+                        }
+                    }
+                }
+            }
+        }
+        if (!lsa_mmap_backed_) {
+            lsa_size_ = 256 * 1024;
+            lsa_data_.resize(lsa_size_, 0);
+            lsa_ptr_ = lsa_data_.data();
+            SPDLOG_INFO("LSA initialized: {} bytes (in-memory, not persistent)", lsa_size_);
+        }
+        constexpr size_t kRequiredTcpLsaSize = 256UL * 1024;  // matches kDefaultLsaSize / CXL_LSA_SIZE
+        if (comm_mode == CommMode::TCP &&
+            (lsa_size_ < kRequiredTcpLsaSize || !lsa_mmap_backed_)) {
+            SPDLOG_ERROR("TCP mode requires a shared LSA backing of at least {} bytes; got {}",
+                         kRequiredTcpLsaSize, lsa_size_);
+            lsa_contract_valid_ = false;
+        }
     }
-    
+
+    ~ThreadPerConnectionServer() {
+        if (lsa_mmap_backed_ && lsa_ptr_) {
+            msync(lsa_ptr_, lsa_size_, MS_SYNC);
+            munmap(lsa_ptr_, lsa_size_);
+        }
+        if (lsa_fd_ >= 0) {
+            close(lsa_fd_);
+        }
+    }
+
     bool start();
     void run();
     void stop();
@@ -278,8 +411,14 @@ int main(int argc, char *argv[]) {
         ("p,port", "Server port", cxxopts::value<int>()->default_value("9999"))
         ("t,topology", "Topology file", cxxopts::value<std::string>()->default_value("topology.txt"))
         ("backing-file", "Back CXL memory with a regular file (shared across VMs)", cxxopts::value<std::string>()->default_value(""))
+        ("lsa-backing-file", "Back the Label Storage Area with a regular file, so namespace/region labels persist and match what QEMU's cxl-lsa memdev shows when this server isn't in the request path. Defaults to /dev/shm/lsa1.raw, the same path the launch scripts point CXL_LSA_FILE at, so the flag is optional as long as both sides use the default", cxxopts::value<std::string>()->default_value("/dev/shm/lsa1.raw"))
         ("comm-mode", "Communication mode: tcp, shm, pgas-shm, or distributed", cxxopts::value<std::string>()->default_value("tcp"))
         ("pgas-shm-name", "PGAS shared memory name (for pgas-shm mode)", cxxopts::value<std::string>()->default_value("/cxlmemsim_pgas"))
+        ("pgas-workers", "Number of PGAS worker threads (1-64)", cxxopts::value<int>()->default_value(std::to_string(PgasPollConfig::kDefaultWorkerCount)))
+        ("pgas-spin-us", "Approximate empty-poll spin window before yielding", cxxopts::value<int>()->default_value(std::to_string(PgasPollConfig::kDefaultSpinUsec)))
+        ("pgas-yield-count", "Number of empty PGAS polls to yield before sleeping", cxxopts::value<int>()->default_value(std::to_string(PgasPollConfig::kDefaultYieldCount)))
+        ("pgas-idle-sleep-us", "PGAS idle sleep duration in microseconds after spin/yield phases", cxxopts::value<int>()->default_value(std::to_string(PgasPollConfig::kDefaultIdleSleepUsec)))
+        ("pgas-record-accesses", "Preserve PGAS controller/switch/expander access accounting", cxxopts::value<bool>()->default_value("false")->implicit_value("true"))
         ("node-id", "Node ID for distributed mode (0 = coordinator)", cxxopts::value<uint32_t>()->default_value("0"))
         ("dist-shm-name", "Shared memory name for distributed inter-node communication", cxxopts::value<std::string>()->default_value("/cxlmemsim_dist"))
         ("coordinator-shm", "Coordinator's shared memory name (for joining existing cluster)", cxxopts::value<std::string>()->default_value(""))
@@ -291,6 +430,7 @@ int main(int argc, char *argv[]) {
     auto result = options.parse(argc, argv);
     
     std::string backing_file = result["backing-file"].as<std::string>();
+    std::string lsa_backing_file = result["lsa-backing-file"].as<std::string>();
     if (result.count("help")) {
         std::cout << options.help() << std::endl;
         return 0;
@@ -305,6 +445,30 @@ int main(int argc, char *argv[]) {
     std::string comm_mode_str = result["comm-mode"].as<std::string>();
     
     std::string pgas_shm_name = result["pgas-shm-name"].as<std::string>();
+    int pgas_workers = result["pgas-workers"].as<int>();
+    int pgas_spin_usec = result["pgas-spin-us"].as<int>();
+    int pgas_yield_count = result["pgas-yield-count"].as<int>();
+    int pgas_idle_sleep_usec = result["pgas-idle-sleep-us"].as<int>();
+    bool pgas_record_accesses = result["pgas-record-accesses"].as<bool>();
+
+    if (pgas_workers < 0 || pgas_spin_usec < 0 ||
+        pgas_yield_count < 0 || pgas_idle_sleep_usec <= 0) {
+        SPDLOG_ERROR("Invalid PGAS configuration: values must be non-negative and pgas-idle-sleep-us must be > 0");
+        return 1;
+    }
+
+    PgasPollConfig pgas_poll_config;
+    pgas_poll_config.worker_count = static_cast<uint32_t>(pgas_workers);
+    pgas_poll_config.spin_usec = static_cast<uint32_t>(pgas_spin_usec);
+    pgas_poll_config.yield_count = static_cast<uint32_t>(pgas_yield_count);
+    pgas_poll_config.idle_sleep_usec = static_cast<uint32_t>(pgas_idle_sleep_usec);
+    pgas_poll_config.record_accesses = pgas_record_accesses;
+
+    std::string pgas_config_error;
+    if (!pgas_poll_config.validate(&pgas_config_error)) {
+        SPDLOG_ERROR("Invalid PGAS configuration: {}", pgas_config_error);
+        return 1;
+    }
 
     // Parse distributed mode options
     uint32_t node_id = result["node-id"].as<uint32_t>();
@@ -422,6 +586,11 @@ int main(int argc, char *argv[]) {
     SPDLOG_INFO("  Communication Mode: {}", mode_str);
     if (comm_mode == CommMode::PGAS_SHM) {
         SPDLOG_INFO("  PGAS SHM Name: {}", pgas_shm_name);
+        SPDLOG_INFO("  PGAS Workers: {}", pgas_poll_config.worker_count);
+        SPDLOG_INFO("  PGAS Spin Usec: {}", pgas_poll_config.spin_usec);
+        SPDLOG_INFO("  PGAS Yield Count: {}", pgas_poll_config.yield_count);
+        SPDLOG_INFO("  PGAS Idle Sleep Usec: {}", pgas_poll_config.idle_sleep_usec);
+        SPDLOG_INFO("  PGAS Record Accesses: {}", pgas_poll_config.record_accesses);
     }
     if (comm_mode == CommMode::DISTRIBUTED) {
         SPDLOG_INFO("  Node ID: {}", node_id);
@@ -542,7 +711,8 @@ int main(int argc, char *argv[]) {
     }
 
     try {
-        ThreadPerConnectionServer server(port, controller, capacity, backing_file, comm_mode, pgas_shm_name);
+        ThreadPerConnectionServer server(port, controller, capacity, backing_file, comm_mode,
+                                         pgas_shm_name, pgas_poll_config, lsa_backing_file);
         g_server = &server;
 
         if (!server.start()) {
@@ -561,6 +731,9 @@ int main(int argc, char *argv[]) {
 
 // ThreadPerConnectionServer implementation
 bool ThreadPerConnectionServer::start() {
+    if (!lsa_contract_valid_) {
+        return false;
+    }
     // Initialize shared memory for data storage first
     if (!shm_manager->initialize()) {
         SPDLOG_ERROR("Failed to initialize shared memory");
@@ -664,7 +837,16 @@ void ThreadPerConnectionServer::run() {
             }
             continue;
         }
-        
+
+        // Fail fast instead of hanging the whole QEMU process (BQL) forever if
+        // a client desyncs or stalls mid-request; TCP_NODELAY avoids Nagle/
+        // delayed-ACK stalls compounding per-chunk RPC latency.
+        int tcp_nodelay_opt = 1;
+        setsockopt(client_fd, IPPROTO_TCP, TCP_NODELAY, &tcp_nodelay_opt, sizeof(tcp_nodelay_opt));
+        struct timeval client_sock_timeout = {.tv_sec = 5, .tv_usec = 0};
+        setsockopt(client_fd, SOL_SOCKET, SO_RCVTIMEO, &client_sock_timeout, sizeof(client_sock_timeout));
+        setsockopt(client_fd, SOL_SOCKET, SO_SNDTIMEO, &client_sock_timeout, sizeof(client_sock_timeout));
+
         // Create a new thread for this client
         int thread_id = next_thread_id++;
         
@@ -851,30 +1033,59 @@ void ThreadPerConnectionServer::handle_request(int client_fd, int thread_id, Ser
         return;
     }
 
+    if (req.op_type == OP_ZERO_RANGE) {
+        resp.status = shm_manager->zero_range(req.addr, req.size) ? 0 : 1;
+        resp.latency_ns = 0;
+        return;
+    }
+
+    if (req.op_type == OP_GET_LSA_INFO) {
+        std::lock_guard<std::mutex> lock(lsa_mutex_);
+        std::memcpy(resp.data, &lsa_size_, sizeof(lsa_size_));
+        resp.status = 0;
+        resp.latency_ns = 0;
+        return;
+    }
+
     // Handle LSA operations
     if (req.op_type == OP_LSA_READ) {
         std::lock_guard<std::mutex> lock(lsa_mutex_);
-        uint64_t clamped_size = std::min((uint64_t)req.size, (uint64_t)64);
-        if (req.addr + clamped_size <= lsa_size_) {
-            memcpy(resp.data, lsa_data_.data() + req.addr, clamped_size);
+        uint64_t clamped_size = std::min((uint64_t)req.size, (uint64_t)sizeof(resp.data));
+        // Overflow-safe bounds check: the naive (req.addr + clamped_size) can
+        // wrap for a malformed wire offset and slip past the comparison, so test
+        // addr and length against lsa_size_ without ever adding them.
+        if (req.addr <= lsa_size_ && clamped_size <= lsa_size_ - req.addr) {
+            memcpy(resp.data, lsa_ptr_ + req.addr, clamped_size);
             resp.status = 0;
         } else {
-            SPDLOG_ERROR("Thread {}: LSA read out of bounds: offset=0x{:x} size={}",
-                         thread_id, (uint64_t)req.addr, clamped_size);
+            SPDLOG_ERROR("Thread {}: LSA read out of bounds: offset=0x{:x} size={} (lsa_size={})",
+                         thread_id, (uint64_t)req.addr, clamped_size, lsa_size_);
             resp.status = 1;
         }
         return;
     }
     if (req.op_type == OP_LSA_WRITE) {
         std::lock_guard<std::mutex> lock(lsa_mutex_);
-        uint64_t clamped_size = std::min((uint64_t)req.size, (uint64_t)64);
-        if (req.addr + clamped_size > lsa_size_) {
-            size_t new_size = req.addr + clamped_size;
-            SPDLOG_INFO("Thread {}: Growing LSA from {} to {} bytes", thread_id, lsa_size_, new_size);
-            lsa_data_.resize(new_size, 0);
-            lsa_size_ = new_size;
+        uint64_t clamped_size = std::min((uint64_t)req.size, (uint64_t)sizeof(req.data));
+        // Reject out-of-bounds writes rather than growing the LSA. QEMU's
+        // cmd_ccls_set_lsa (CXL r3.1 8.2.9.9.2.4) already bounds-checks
+        // offset+length against the advertised LSA size before issuing this RPC,
+        // so an OOB write here means the two sides have desynced. Silently
+        // growing would leave lsa_size_ disagreeing with QEMU's memdev and with
+        // what OP_GET_LSA_INFO previously reported; rejecting matches OP_LSA_READ
+        // and the device the server emulates. The check is written overflow-safe
+        // (addr <= size && len <= size - addr) so a malformed wire offset cannot
+        // wrap past it.
+        if (req.addr > lsa_size_ || clamped_size > lsa_size_ - req.addr) {
+            SPDLOG_ERROR("Thread {}: LSA write out of bounds: offset=0x{:x} size={} (lsa_size={})",
+                         thread_id, (uint64_t)req.addr, clamped_size, lsa_size_);
+            resp.status = 1;
+            return;
         }
-        memcpy(lsa_data_.data() + req.addr, req.data, clamped_size);
+        memcpy(lsa_ptr_ + req.addr, req.data, clamped_size);
+        if (lsa_mmap_backed_) {
+            msync(lsa_ptr_ + req.addr, clamped_size, MS_ASYNC);
+        }
         resp.status = 0;
         return;
     }
@@ -895,17 +1106,6 @@ void ThreadPerConnectionServer::handle_request(int client_fd, int thread_id, Ser
     // SPDLOG_INFO("Thread {}: {} request - addr=0x{:x}, size={}, cacheline=0x{:x}",
     //             thread_id, op_name, req.addr, req.size, cacheline_addr);
 
-    if (req.op_type == OP_WRITE) {
-        // Log first 16 bytes of write data
-        std::stringstream data_str;
-        for (int i = 0; i < std::min(16UL, req.size); i++) {
-            data_str << std::hex << std::setfill('0') << std::setw(2) 
-                    << static_cast<int>(req.data[i]) << " ";
-        }
-        // SPDLOG_INFO("Thread {}: WRITE data (first 16 bytes): {}", 
-        //            thread_id, data_str.str());
-    }
-    
     // Check if address is valid in shared memory
     if (!shm_manager->is_valid_address(req.addr)) {
         SPDLOG_ERROR("Thread {}: Invalid address 0x{:x} not in CXL memory range",
@@ -917,17 +1117,31 @@ void ThreadPerConnectionServer::handle_request(int client_fd, int thread_id, Ser
     // Increment active requests
     congestion_info.active_requests++;
     
-    // Calculate base latency using CXL controller
+    // Base latency. calculate_latency() is NOT read-only: it sorts the
+    // expander's `occupation` vector and rebuilds its caches, which the
+    // insert() calls below (emplace_back) also mutate. It therefore must run
+    // under memory_mutex; running it outside was a heap-corrupting data race
+    // that surfaced as a non-deterministic SIGSEGV during CXL device init.
     std::vector<std::tuple<uint64_t, uint64_t>> access_elem;
     access_elem.push_back(std::make_tuple((uint64_t)req.addr, (uint64_t)req.size));
-    double base_latency = controller->calculate_latency(access_elem, controller->dramlatency);
-    
+    double base_latency = 0.0;
+
     // Handle coherency and memory operation
     {
         std::unique_lock<std::shared_mutex> lock(memory_mutex);
-        
+
+        base_latency = controller->calculate_latency(access_elem, controller->dramlatency);
+
         // Get metadata from shared memory manager
-        auto* metadata = shm_manager->get_cacheline_metadata(cacheline_addr);
+        CachelineMetadata transient_metadata;
+        auto* metadata = req.op_type == OP_READ
+            ? shm_manager->find_cacheline_metadata(cacheline_addr)
+            : shm_manager->get_cacheline_metadata(cacheline_addr);
+        if (!metadata && req.op_type == OP_READ) {
+            // Untouched backing memory is already zero. Avoid materializing a
+            // persistent coherency record for a read-only zero cacheline.
+            metadata = &transient_metadata;
+        }
         if (!metadata) {
             SPDLOG_ERROR("Thread {}: Failed to get metadata for cacheline 0x{:x}", 
                         thread_id, cacheline_addr);
@@ -972,15 +1186,6 @@ void ThreadPerConnectionServer::handle_request(int client_fd, int thread_id, Ser
                 congestion_info.active_requests--;
                 return;
             }
-            
-            // Log the data being read
-            std::stringstream read_data_str;
-            for (int i = 0; i < std::min(16UL, req.size); i++) {
-                read_data_str << std::hex << std::setfill('0') << std::setw(2) 
-                             << static_cast<int>(resp.data[i]) << " ";
-            }
-            // SPDLOG_INFO("Thread {}: READ response data (first 16 bytes): {}", 
-            //            thread_id, read_data_str.str());
             
             // Add back invalidation latency penalty if we had one
             if (had_back_invalidation) {
@@ -1039,32 +1244,12 @@ void ThreadPerConnectionServer::handle_request(int client_fd, int thread_id, Ser
                 return;
             }
 
-            // CRITICAL: Force sync to physical memory so other guests can see it
-            auto* metadata_ptr = shm_manager->get_cacheline_metadata(cacheline_addr);
-            if (metadata_ptr) {
-                msync(metadata_ptr, sizeof(CachelineMetadata), MS_SYNC);
-            }
-            // Force sync the data as well
-            void* data_ptr = shm_manager->get_data_area();
-            if (data_ptr) {
-                msync((uint8_t*)data_ptr + (cacheline_addr & ~SHM_CACHELINE_MASK), SHM_CACHELINE_SIZE, MS_SYNC);
-            }
+            // Publish the write. The /dev/shm MAP_SHARED region is already
+            // cross-process coherent (write_cacheline() page-syncs a real file);
+            // a release fence gives intra-process ordering. The old per-write
+            // double msync + read-back-verify was pure hot-path overhead.
             std::atomic_thread_fence(std::memory_order_release);
 
-            // SPDLOG_INFO("Thread {}: WRITE completed successfully at addr=0x{:x}, size={}",
-                    //    thread_id, req.addr, req.size);
-            
-            // Verify write by reading back
-            uint8_t verify_data[64];
-            if (shm_manager->read_cacheline(req.addr, verify_data, req.size)) {
-                std::stringstream verify_str;
-                for (int i = 0; i < std::min(16UL, req.size); i++) {
-                    verify_str << std::hex << std::setfill('0') << std::setw(2) 
-                              << static_cast<int>(verify_data[i]) << " ";
-                }
-
-            }
-            
             // Register back invalidation for threads that had this cacheline
             if (!threads_to_invalidate.empty()) {
                 // Read the dirty data from shared memory for back invalidation
@@ -1135,14 +1320,17 @@ void ThreadPerConnectionServer::handle_atomic_request(int thread_id, ServerReque
     // Increment active requests for congestion tracking
     congestion_info.active_requests++;
 
-    // Calculate base latency using CXL controller
+    // Base latency. calculate_latency() mutates shared expander state, so it
+    // must run under memory_mutex to avoid racing insert(). See handle_request().
     std::vector<std::tuple<uint64_t, uint64_t>> access_elem;
     access_elem.push_back(std::make_tuple((uint64_t)req.addr, (uint64_t)sizeof(uint64_t)));
-    double base_latency = controller->calculate_latency(access_elem, controller->dramlatency);
+    double base_latency = 0.0;
 
     // Atomic operations require exclusive access with proper coherency
     {
         std::unique_lock<std::shared_mutex> lock(memory_mutex);
+
+        base_latency = controller->calculate_latency(access_elem, controller->dramlatency);
 
         // Get metadata from shared memory manager
         auto* metadata = shm_manager->get_cacheline_metadata(cacheline_addr);
@@ -1327,10 +1515,21 @@ void ThreadPerConnectionServer::handle_client(int client_fd, int thread_id) {
         }
 
         // Validate op_type before processing
-        if (req.op_type > OP_LSA_WRITE) {
+        if (req.op_type > OP_GET_LSA_INFO) {
             SPDLOG_WARN("Thread {}: Invalid op_type {} (0x{:02x}) - possibly non-CXL client (HTTP scanner?), disconnecting",
                         thread_id, (int)req.op_type, (int)req.op_type);
             break;
+        }
+
+        const uint64_t debug_request_id = debug_requests_seen_.fetch_add(1, std::memory_order_relaxed);
+        const bool trace_request = debug_request_id < debug_request_limit_;
+        if (trace_request) {
+            const uint64_t request_addr = req.addr;
+            const uint64_t request_size = req.size;
+            const uint64_t request_timestamp = req.timestamp;
+            SPDLOG_INFO("TRACE TCP request #{} thread={} op={} addr=0x{:x} size={} timestamp={}",
+                        debug_request_id + 1, thread_id, debug_op_name(req.op_type),
+                        request_addr, request_size, request_timestamp);
         }
 
         // Handle special request for shared memory info
@@ -1352,6 +1551,13 @@ void ThreadPerConnectionServer::handle_client(int client_fd, int thread_id) {
                 SPDLOG_ERROR("Thread {}: Failed to send shared memory info", thread_id);
                 break;
             }
+            if (trace_request) {
+                const uint64_t response_size = shm_resp.size;
+                const uint64_t response_cachelines = shm_resp.num_cachelines;
+                SPDLOG_INFO("TRACE TCP response #{} thread={} op=GET_SHM_INFO status={} shm={} size={} cachelines={}",
+                            debug_request_id + 1, thread_id, shm_resp.status,
+                            shm_resp.shm_name, response_size, response_cachelines);
+            }
             continue;
         }
 
@@ -1359,7 +1565,7 @@ void ThreadPerConnectionServer::handle_client(int client_fd, int thread_id) {
         ServerResponse resp = {0};
 
         // Clamp size to data buffer limit to prevent out-of-bounds reads
-        if (req.size > sizeof(req.data)) {
+        if (req.op_type != OP_ZERO_RANGE && req.size > sizeof(req.data)) {
             SPDLOG_WARN("Thread {}: Clamping request size from {} to {} (data buffer limit)",
                         thread_id, (uint64_t)req.size, sizeof(req.data));
             req.size = sizeof(req.data);
@@ -1371,6 +1577,12 @@ void ThreadPerConnectionServer::handle_client(int client_fd, int thread_id) {
         if (sent != sizeof(resp)) {
             SPDLOG_ERROR("Thread {}: Failed to send response", thread_id);
             break;
+        }
+        if (trace_request) {
+            const uint64_t response_latency = resp.latency_ns;
+            SPDLOG_INFO("TRACE TCP response #{} thread={} op={} status={} latency_ns={}",
+                        debug_request_id + 1, thread_id, debug_op_name(req.op_type),
+                        resp.status, response_latency);
         }
     }
     
@@ -1481,7 +1693,18 @@ void ThreadPerConnectionServer::handle_shm_requests() {
         req.timestamp = shm_req.timestamp;
         req.value = shm_req.value;       // For atomic FAA/CAS operations
         req.expected = shm_req.expected; // For atomic CAS operation
-        std::memcpy(req.data, shm_req.data, sizeof(req.data));
+        std::memcpy(req.data, shm_req.data, sizeof(shm_req.data));
+
+        const uint64_t debug_request_id = debug_requests_seen_.fetch_add(1, std::memory_order_relaxed);
+        const bool trace_request = debug_request_id < debug_request_limit_;
+        if (trace_request) {
+            const uint64_t request_addr = req.addr;
+            const uint64_t request_size = req.size;
+            const uint64_t request_timestamp = req.timestamp;
+            SPDLOG_INFO("TRACE SHM request #{} client={} op={} addr=0x{:x} size={} timestamp={}",
+                        debug_request_id + 1, client_id, debug_op_name(req.op_type),
+                        request_addr, request_size, request_timestamp);
+        }
 
         // Handle special request for shared memory info
         if (req.op_type == OP_GET_SHM_INFO) {
@@ -1497,6 +1720,11 @@ void ThreadPerConnectionServer::handle_shm_requests() {
             shm_resp.status = 0;
             
             shm_comm_manager->send_response(client_id, shm_resp);
+            if (trace_request) {
+                SPDLOG_INFO("TRACE SHM response #{} client={} op=GET_SHM_INFO status={} size={} cachelines={}",
+                            debug_request_id + 1, client_id, shm_resp.status,
+                            data_ptr[1], data_ptr[2]);
+            }
             continue;
         }
         
@@ -1513,6 +1741,12 @@ void ThreadPerConnectionServer::handle_shm_requests() {
         
         // Send response back
         shm_comm_manager->send_response(client_id, shm_resp);
+        if (trace_request) {
+            const uint64_t response_latency = shm_resp.latency_ns;
+            SPDLOG_INFO("TRACE SHM response #{} client={} op={} status={} latency_ns={}",
+                        debug_request_id + 1, client_id, debug_op_name(req.op_type),
+                        shm_resp.status, response_latency);
+        }
     }
 }
 
@@ -1617,16 +1851,29 @@ void ThreadPerConnectionServer::run_pgas_shm_mode() {
     __atomic_store_n(&pgas_shm_header_->server_ready, 1, __ATOMIC_RELEASE);
 
     // Create worker threads for handling PGAS SHM requests
-    const int num_workers = 4;
+    const int num_workers = static_cast<int>(pgas_poll_config_.worker_count);
     std::vector<std::thread> workers;
 
     for (int i = 0; i < num_workers; i++) {
         workers.emplace_back([this]() {
+            PgasPollPolicy poll_policy(pgas_poll_config_);
             while (running) {
                 int processed = poll_pgas_shm_requests();
-                if (processed == 0) {
-                    // No requests - sleep briefly to reduce CPU usage
-                    usleep(100);  // 100us
+                if (processed > 0) {
+                    poll_policy.onActivity();
+                    continue;
+                }
+
+                switch (poll_policy.onIdle()) {
+                case PgasPollAction::Spin:
+                    std::atomic_signal_fence(std::memory_order_seq_cst);
+                    break;
+                case PgasPollAction::Yield:
+                    std::this_thread::yield();
+                    break;
+                case PgasPollAction::Sleep:
+                    usleep(pgas_poll_config_.idle_sleep_usec);
+                    break;
                 }
             }
         });
@@ -1691,13 +1938,14 @@ int ThreadPerConnectionServer::poll_pgas_shm_requests() {
                 slot->resp_status = CXL_SHM_RESP_OK;
                 total_reads++;
 
-                // Propagate stats through CXL topology
-                controller->counter.inc_local();
-                for (auto &sw : controller->switches) {
-                    sw->insert(slot->timestamp, 0, addr, addr, 0);
-                }
-                for (auto &ep : controller->expanders) {
-                    ep->insert(slot->timestamp, 0, addr, addr, ep->id);
+                if (pgas_poll_config_.record_accesses) {
+                    controller->counter.inc_local();
+                    for (auto &sw : controller->switches) {
+                        sw->insert(slot->timestamp, 0, addr, addr, 0);
+                    }
+                    for (auto &ep : controller->expanders) {
+                        ep->insert(slot->timestamp, 0, addr, addr, ep->id);
+                    }
                 }
 
                 log_periodic_stats("PGAS_READ", total_reads.load());
@@ -1722,13 +1970,14 @@ int ThreadPerConnectionServer::poll_pgas_shm_requests() {
                 slot->resp_status = CXL_SHM_RESP_OK;
                 total_writes++;
 
-                // Propagate stats through CXL topology
-                controller->counter.inc_local();
-                for (auto &sw : controller->switches) {
-                    sw->insert(slot->timestamp, 0, addr, addr, 0);
-                }
-                for (auto &ep : controller->expanders) {
-                    ep->insert(slot->timestamp, 0, addr, addr, ep->id);
+                if (pgas_poll_config_.record_accesses) {
+                    controller->counter.inc_local();
+                    for (auto &sw : controller->switches) {
+                        sw->insert(slot->timestamp, 0, addr, addr, 0);
+                    }
+                    for (auto &ep : controller->expanders) {
+                        ep->insert(slot->timestamp, 0, addr, addr, ep->id);
+                    }
                 }
 
                 log_periodic_stats("PGAS_WRITE", total_writes.load());

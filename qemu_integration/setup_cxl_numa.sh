@@ -4,9 +4,18 @@
 # This script automatically configures CXL memory as NUMA node 1 at boot
 
 set -e
+set -o pipefail
 
 LOG_FILE="/var/log/cxl_numa_setup.log"
-CXL_REGION_SIZE="256M"
+# CXL region size is passed from the host launch script via the kernel cmdline
+# (cxl_region_mb=<MB>), so it stays in lockstep with the QEMU cxl-mem1 backing
+# size. Fall back to 256M if not provided.
+CXL_REGION_MB=$(sed -n 's/.*\bcxl_region_mb=\([0-9]\+\).*/\1/p' /proc/cmdline)
+if [ -n "$CXL_REGION_MB" ] && [ "$CXL_REGION_MB" -gt 0 ] 2>/dev/null; then
+    CXL_REGION_SIZE="${CXL_REGION_MB}M"
+else
+    CXL_REGION_SIZE="256M"
+fi
 MAX_RETRIES=10
 RETRY_DELAY=2
 
@@ -30,7 +39,7 @@ wait_for_cxl_device() {
 }
 
 setup_cxl_region() {
-    log "Creating CXL region..."
+    log "Creating CXL region (size ${CXL_REGION_SIZE}, from cxl_region_mb kernel cmdline)..."
     
     # Check if region already exists
     if cxl list -R 2>/dev/null | grep -q "region0"; then
@@ -99,12 +108,20 @@ configure_numa_node() {
         if daxctl reconfigure-device --mode=system-ram "$dax_device" 2>&1 | tee -a "$LOG_FILE"; then
             log "Memory onlined as system RAM"
         else
-            log "WARNING: Could not online memory as system RAM"
+            log "ERROR: Could not online memory as system RAM"
+            return 1
         fi
+    else
+        log "ERROR: DAX device has no target_node"
+        return 1
     fi
     
     # Verify NUMA configuration
     numactl --hardware 2>&1 | tee -a "$LOG_FILE"
+    if ! numactl --hardware 2>/dev/null | grep -Eq '^node [1-9][0-9]* size: [1-9][0-9]* MB'; then
+        log "ERROR: No nonzero memory-only NUMA node was created"
+        return 1
+    fi
     
     return 0
 }
@@ -124,24 +141,27 @@ main() {
     
     # Wait for CXL device to appear
     if ! wait_for_cxl_device; then
-        log "Aborting: CXL device not available"
-        exit 1
+        log "Warning: CXL device not available, skipping CXL/NUMA setup"
+        return 1
     fi
     
     # Setup CXL region
     if ! setup_cxl_region; then
-        log "Warning: CXL region setup failed, continuing anyway"
+        log "ERROR: CXL region setup failed"
+        return 1
     fi
     
     # Setup DAX namespace
     if ! setup_dax_namespace; then
-        log "Warning: DAX namespace setup failed, continuing anyway"
+        log "ERROR: DAX namespace setup failed"
+        return 1
     fi
     
     # Configure NUMA node
-    #if ! configure_numa_node; then
-    #    log "Warning: NUMA node configuration incomplete"
-    #fi
+    if ! configure_numa_node; then
+        log "ERROR: NUMA node configuration incomplete"
+        return 1
+    fi
     
     log "CXL NUMA configuration completed"
     
@@ -152,9 +172,16 @@ main() {
     numactl --hardware 2>&1 | tee -a "$LOG_FILE"
 }
 
-# Run main function
-main
+# Run main function. Network bring-up below must run regardless of whether
+# CXL/NUMA provisioning succeeded, so don't let a non-zero return from main
+# (combined with `set -e`) skip it.
+setup_status=0
+main || setup_status=$?
+if [ "$setup_status" -ne 0 ]; then
+    log "CXL/NUMA configuration failed (see above); continuing to network setup"
+fi
 #dhcpcd
 ip link set enp0s2 up
 ip addr add 192.168.100.10/24 dev enp0s2
 ip route add default via 192.168.100.1
+exit "$setup_status"

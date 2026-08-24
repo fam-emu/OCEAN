@@ -195,28 +195,27 @@ int CXLMemExpander::insert(uint64_t timestamp, uint64_t tid, uint64_t phys_addr,
                 request_queue_.push_back(req);
             }
             
-            // 使用哈希表快速检查地址是否已存在
-            bool address_exists = address_cache.find(phys_addr) != address_cache.end();
+            // O(1) lookup via occupation_pos_ instead of an O(n) scan per
+            // re-access (the O(n^2) that stalled dax-namespace init). Re-check
+            // the stored address to guard against stale indices.
+            auto pos_it = occupation_pos_.find(phys_addr);
+            if (pos_it != occupation_pos_.end() && pos_it->second < this->occupation.size() &&
+                this->occupation[pos_it->second].address == phys_addr) {
+                // 地址已存在：就地刷新时间戳（不再做 O(n) 的 erase+emplace_back）。
+                this->occupation[pos_it->second].timestamp = timestamp;
+                this->occupation[pos_it->second].access_count = 0;
+                this->counter.inc_load();
 
-            if (address_exists) {
-                // 地址已存在，找到并更新
-                for (auto it = this->occupation.cbegin(); it != this->occupation.cend(); it++) {
-                    if (it->address == phys_addr) {
-                        this->occupation.erase(it);
-                        this->occupation.emplace_back(timestamp, phys_addr, 0);
-                        this->counter.inc_load();
+                // Update request type
+                request_queue_.back().is_read = true;
+                request_queue_.back().is_write = false;
 
-                        // Update request type
-                        request_queue_.back().is_read = true;
-                        request_queue_.back().is_write = false;
-                        
-                        // 不需要更新缓存，地址没变
-                        return 2;
-                    }
-                }
+                // 不需要更新缓存，地址没变
+                return 2;
             }
 
             // 地址不存在，添加新条目
+            occupation_pos_[phys_addr] = this->occupation.size();
             this->occupation.emplace_back(timestamp, phys_addr, 0);
 
             // 更新地址缓存

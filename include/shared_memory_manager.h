@@ -110,12 +110,14 @@ public:
     uint8_t* get_cacheline_data(uint64_t cacheline_addr);
     bool read_cacheline(uint64_t addr, uint8_t* buffer, size_t size);
     bool write_cacheline(uint64_t addr, const uint8_t* data, size_t size);
+    bool zero_range(uint64_t addr, size_t size);
 
     // Direct access to data area (for msync)
     void* get_data_area() { return data_area; }
 
     // Metadata access (uses local cache)
     CachelineMetadata* get_cacheline_metadata(uint64_t cacheline_addr);
+    CachelineMetadata* find_cacheline_metadata(uint64_t cacheline_addr);
     
     // Set the base address (for distributed mode where each node needs a unique range)
     void set_base_addr(uint64_t addr);
@@ -132,8 +134,11 @@ public:
     
     uint64_t cacheline_to_index(uint64_t cacheline_addr) const {
         if (header && header->base_addr == 0) {
-            // Accept any address, use modulo to map to available cachelines
-            return (cacheline_addr / SHM_CACHELINE_SIZE) % header->num_cachelines;
+            // Raw index, NO modulo wrap: the caller bounds-checks against
+            // num_cachelines and rejects an out-of-range DPA. The old
+            // `% num_cachelines` aliased distinct guest pages onto one server
+            // cacheline, corrupting CXL-resident code pages -> guest #UD.
+            return cacheline_addr / SHM_CACHELINE_SIZE;
         }
         return header ? (cacheline_addr - header->base_addr) / SHM_CACHELINE_SIZE : 0;
     }

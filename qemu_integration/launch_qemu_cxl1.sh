@@ -1,23 +1,97 @@
 #!/bin/bash
 
-QEMU_BINARY=/usr/local/bin/qemu-system-x86_64
+QEMU_BINARY=${QEMU_BINARY:-/usr/local/bin/qemu-system-x86_64}
+QEMU_DATA_DIR=${QEMU_DATA_DIR:-/usr/local/share/qemu}
 export CXL_MEMSIM_HOST=${CXL_MEMSIM_HOST:-127.0.0.1}
 export CXL_MEMSIM_PORT=${CXL_MEMSIM_PORT:-9999}
 VM_MEMORY=${VM_MEMORY:-2G}
 CXL_MEMORY=${CXL_MEMORY:-4G}
 DISK_IMAGE=${DISK_IMAGE:-plucky-server-cloudimg-amd64.img}
 
-# Route QEMU CXL.mem/LSA traffic through the TCP RPC backend by default.
 export CXL_TRANSPORT_MODE=${CXL_TRANSPORT_MODE:-tcp}
 export CXL_HOST_ID=1
+# Latency injection disabled for the initial two-VM bring-up (it busy-spins
+# under the QEMU BQL per RPC and makes this VM far more soft-lockup-prone than
+# VM0). Set to 1 once a clean two-VM run is confirmed.
 export CXL_LATENCY_INJECT=1
-$QEMU_BINARY \
-    --enable-kvm -cpu qemu64,+xsave,+rdtscp,+avx,+avx2,+sse4.1,+sse4.2,+avx512f,+avx512dq,+avx512ifma,+avx512cd,+avx512bw,+avx512vl,+avx512vbmi,+clflushopt  \
+KERNEL_EXTRA_ARGS=${CXL_KERNEL_EXTRA_ARGS:-}
+
+usage() {
+    echo "Usage: $0 [--kvm|--kvm-direct|--tcg]" >&2
+}
+
+if [ "$#" -gt 1 ]; then
+    usage
+    exit 2
+fi
+
+QEMU_MODE=${1:---kvm}
+KVM_CPU='qemu64,+xsave,+rdtscp,+avx,+avx2,+sse4.1,+sse4.2,+avx512f,+avx512dq,+avx512ifma,+avx512cd,+avx512bw,+avx512vl,+avx512vbmi,+clflushopt'
+case "$QEMU_MODE" in
+    --kvm)
+        export CXL_EXECUTION_MODE=memsim
+        QEMU_ACCEL_ARGS=(--enable-kvm -cpu "$KVM_CPU")
+        VCPU_COUNT=1
+        ;;
+    --kvm-direct)
+        export CXL_EXECUTION_MODE=kvm-direct
+        QEMU_ACCEL_ARGS=(--enable-kvm -cpu "$KVM_CPU")
+        # 2 vCPUs: the guest device-dax 2 MiB PMD fault path spins on a
+        # per-folio lock bit; with a single vCPU the lock holder can never be
+        # scheduled -> livelock -> TCO watchdog resets the guest mid-OSU. A
+        # second schedulable CPU lets the holder run and release the bit.
+        VCPU_COUNT=2
+        ;;
+    --tcg)
+        export CXL_EXECUTION_MODE=memsim
+        QEMU_ACCEL_ARGS=(--accel tcg,thread=multi -cpu max)
+        VCPU_COUNT=4
+        ;;
+    *)
+        usage
+        exit 2
+        ;;
+esac
+
+# Keep the Type-3 device and guest region capacities in lockstep. In
+# kvm-direct mode CXL_BACKING_FILE is the shared guest data plane.
+export CXL_CAPACITY_MB=${CXL_CAPACITY_MB:-2048}
+case "$CXL_CAPACITY_MB" in
+    ''|*[!0-9]*)
+        echo "CXL_CAPACITY_MB must be a positive integer" >&2
+        exit 2
+        ;;
+esac
+if [ "$CXL_CAPACITY_MB" -eq 0 ]; then
+    echo "CXL_CAPACITY_MB must be a positive integer" >&2
+    exit 2
+fi
+# Mirror VM0's bulk-zero mitigations so the guest DAX probe on this host does
+# not drive a per-cacheline synchronous RPC storm (the soft-lockup source).
+export CXL_MEMSIM_BULK_ZERO_WRITES=${CXL_MEMSIM_BULK_ZERO_WRITES:-0}
+export CXL_MEMSIM_PREZERO_ZERO_WRITES_NOOP=${CXL_MEMSIM_PREZERO_ZERO_WRITES_NOOP:-0}
+CXL_DATA_BYTES=$((CXL_CAPACITY_MB * 1024 * 1024 - 4096))
+export CXL_MEMSIM_ZERO_RANGE=${CXL_MEMSIM_ZERO_RANGE:-0:${CXL_DATA_BYTES}}
+CXL_REGION_MB=$CXL_CAPACITY_MB
+KERNEL_APPEND="root=/dev/sda rw console=ttyS0,115200 nokaslr cxl_region_mb=${CXL_REGION_MB}"
+if [ -n "$KERNEL_EXTRA_ARGS" ]; then
+    KERNEL_APPEND="$KERNEL_APPEND $KERNEL_EXTRA_ARGS"
+fi
+CXL_BACKING_FILE=${CXL_BACKING_FILE:-/dev/shm/cxl-kvm-direct.raw}
+export CXL_LSA_FILE=${CXL_LSA_FILE:-/dev/shm/lsa1.raw}
+# LSA (label) area size. 256 KiB holds ~1024 label slots -- ample for any
+# namespace count -- and keeps the guest's boot-time label read tiny. MUST match
+# kDefaultLsaSize in src/main_server.cc and required_lsa_size in
+# lib/qemu/hw/mem/cxl_type3.c; all three map the same shared CXL_LSA_FILE.
+CXL_LSA_SIZE=${CXL_LSA_SIZE:-256K}
+"$QEMU_BINARY" \
+    "${QEMU_ACCEL_ARGS[@]}" \
+    -L "$QEMU_DATA_DIR" \
     -m 16G,maxmem=32G,slots=8 \
-    -smp 4 \
+    -smp "$VCPU_COUNT" \
     -M q35,cxl=on \
     -kernel ./bzImage \
-    -append "root=/dev/sda rw console=ttyS0,115200 nokaslr" \
+    -append "$KERNEL_APPEND" \
     -drive file=./qemu1.img,index=0,media=disk,format=raw \
     -netdev tap,id=net0,ifname=tap1,script=no,downscript=no \
     -device virtio-net-pci,netdev=net0,mac=52:54:00:00:00:02 \
@@ -29,7 +103,7 @@ $QEMU_BINARY \
     -device cxl-type3,bus=root_port13,persistent-memdev=cxl-mem1,lsa=cxl-lsa1,id=cxl-pmem0,sn=0x1 \
     -device cxl-type1,bus=root_port14,size=1G,cache-size=64M \
     -device virtio-cxl-accel-pci,bus=pcie.0 \
-    -object memory-backend-file,id=cxl-mem1,share=on,mem-path=/dev/shm/cxlmemsim_shared,size=1G \
-    -object memory-backend-file,id=cxl-lsa1,share=on,mem-path=/dev/shm/lsa1.raw,size=1G \
+    -object memory-backend-file,id=cxl-mem1,share=on,mem-path="$CXL_BACKING_FILE",size=${CXL_CAPACITY_MB}M \
+    -object memory-backend-file,id=cxl-lsa1,share=on,mem-path="$CXL_LSA_FILE",size=$CXL_LSA_SIZE \
     -M cxl-fmw.0.targets.0=cxl.1,cxl-fmw.0.size=4G \
     -nographic

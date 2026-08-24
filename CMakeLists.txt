@@ -61,3 +61,13 @@ install(TARGETS cxlmemsim_server
 
 install(FILES include/tcp_communication.h
         DESTINATION include/cxlmemsim)
+
+enable_testing()
+
+add_executable(test_pgas_poll_policy tests/test_pgas_poll_policy.cpp)
+target_include_directories(test_pgas_poll_policy PRIVATE include)
+add_test(NAME test_pgas_poll_policy COMMAND test_pgas_poll_policy)
+
+add_executable(test_cxl_memsim_wait_policy tests/test_cxl_memsim_wait_policy.c)
+target_include_directories(test_cxl_memsim_wait_policy PRIVATE lib/qemu/include)
+add_test(NAME test_cxl_memsim_wait_policy COMMAND test_cxl_memsim_wait_policy)

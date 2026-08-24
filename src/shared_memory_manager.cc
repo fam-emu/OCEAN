@@ -22,8 +22,9 @@ SharedMemoryManager::SharedMemoryManager(size_t capacity_mb, const std::string& 
     : capacity_mb(capacity_mb), shm_name(shm_name), shm_fd(-1), shm_base(nullptr), 
       shm_size(0), header(nullptr), data_area(nullptr) {
     
-    // Calculate sizes
-    shm_size = capacity_mb * 1024 * 1024;
+    // capacity_mb is the addressable data capacity; reserve the header on top
+    // so the final cacheline isn't lost.
+    shm_size = capacity_mb * 1024 * 1024 + sizeof(SharedMemoryHeader);
     
     // Reserve some space for header
     size_t header_size = sizeof(SharedMemoryHeader);
@@ -36,7 +37,7 @@ SharedMemoryManager::SharedMemoryManager(size_t capacity_mb, const std::string& 
 SharedMemoryManager::SharedMemoryManager(size_t capacity_mb, const std::string& shm_name, bool use_file, const std::string& file_path)
     : capacity_mb(capacity_mb), shm_name(shm_name), shm_fd(-1), shm_base(nullptr),
       shm_size(0), header(nullptr), data_area(nullptr) {
-    shm_size = capacity_mb * 1024 * 1024;
+    shm_size = capacity_mb * 1024 * 1024 + sizeof(SharedMemoryHeader);
     use_file_backing = use_file;
     backing_file_path = file_path;
     SPDLOG_INFO("SharedMemoryManager: Capacity {}MB, Total size: {} bytes", capacity_mb, shm_size);
@@ -262,10 +263,14 @@ uint8_t* SharedMemoryManager::get_cacheline_data(uint64_t cacheline_addr) {
         return nullptr;
     }
     
-    // If base_addr is 0, accept any address and use modulo mapping
+    // If base_addr is 0, accept any address at offset 0 and bounds-check it.
     if (header->base_addr == 0) {
         uint64_t index = cacheline_to_index(cacheline_addr);
-        // cacheline_to_index already handles modulo when base_addr is 0
+        if (index >= header->num_cachelines) {
+            // Out-of-range DPA: reject instead of folding modulo (which
+            // aliased/corrupted memory -> guest #UD). Caller reports failure.
+            return nullptr;
+        }
         return data_area + (index * SHM_CACHELINE_SIZE);
     }
     
@@ -298,11 +303,18 @@ bool SharedMemoryManager::read_cacheline(uint64_t addr, uint8_t* buffer, size_t 
             uint64_t current_addr = addr + bytes_read;
             uint64_t cacheline_addr = addr_to_cacheline(current_addr);
             uint64_t index = cacheline_to_index(cacheline_addr);
+            if (index >= header->num_cachelines) {
+                // DPA beyond server capacity: reject rather than modulo-alias.
+                SPDLOG_ERROR("read_cacheline: DPA 0x{:x} (index {}) exceeds capacity "
+                             "({} cachelines) - is guest region larger than --capacity?",
+                             current_addr, index, header->num_cachelines);
+                return false;
+            }
             uint8_t* cacheline_data = data_area + (index * SHM_CACHELINE_SIZE);
-            
+
             size_t offset = current_addr - cacheline_addr;
             size_t bytes_in_cacheline = std::min(size - bytes_read, SHM_CACHELINE_SIZE - offset);
-            
+
             memcpy(buffer + bytes_read, cacheline_data + offset, bytes_in_cacheline);
             bytes_read += bytes_in_cacheline;
             
@@ -338,6 +350,28 @@ bool SharedMemoryManager::read_cacheline(uint64_t addr, uint8_t* buffer, size_t 
     return true;
 }
 
+// Flush only the page(s) covering [p, p+len), clamped to the mapping. Replaces
+// a per-write full-region msync (O(region size) per <=64B write) that stalled
+// `ndctl create-namespace -m dax` for minutes and tripped a soft-lockup. On
+// /dev/shm MAP_SHARED this is a near-no-op; on a real file it persists the page.
+static inline void sync_shm_page_range(void* base, size_t size, void* p, size_t len) {
+    if (!base || size == 0) {
+        return;
+    }
+    const uintptr_t ps = (uintptr_t)sysconf(_SC_PAGESIZE);
+    const uintptr_t b = (uintptr_t)base;
+    uintptr_t start = ((uintptr_t)p) & ~(ps - 1);
+    uintptr_t end = ((uintptr_t)p) + len;
+    if (start < b) start = b;
+    if (end > b + size) end = b + size;
+    if (end <= start) {
+        return;
+    }
+    if (msync((void*)start, end - start, MS_SYNC) != 0) {
+        SPDLOG_DEBUG("sync_shm_page_range: msync failed: {}", strerror(errno));
+    }
+}
+
 bool SharedMemoryManager::write_cacheline(uint64_t addr, const uint8_t* data, size_t size) {
     if (size == 0 || size > SHM_CACHELINE_SIZE) {
         SPDLOG_ERROR("write_cacheline: invalid size {} (max {})", size, SHM_CACHELINE_SIZE);
@@ -353,11 +387,18 @@ bool SharedMemoryManager::write_cacheline(uint64_t addr, const uint8_t* data, si
             uint64_t current_addr = addr + bytes_written;
             uint64_t cacheline_addr = addr_to_cacheline(current_addr);
             uint64_t index = cacheline_to_index(cacheline_addr);
+            if (index >= header->num_cachelines) {
+                // DPA beyond server capacity: reject rather than modulo-alias.
+                SPDLOG_ERROR("write_cacheline: DPA 0x{:x} (index {}) exceeds capacity "
+                             "({} cachelines) - is guest region larger than --capacity?",
+                             current_addr, index, header->num_cachelines);
+                return false;
+            }
             uint8_t* cacheline_data = data_area + (index * SHM_CACHELINE_SIZE);
-            
+
             size_t offset = current_addr - cacheline_addr;
             size_t bytes_in_cacheline = std::min(size - bytes_written, SHM_CACHELINE_SIZE - offset);
-            
+
             memcpy(cacheline_data + offset, data + bytes_written, bytes_in_cacheline);
             bytes_written += bytes_in_cacheline;
             
@@ -367,12 +408,11 @@ bool SharedMemoryManager::write_cacheline(uint64_t addr, const uint8_t* data, si
         
         // Use stronger memory barrier for shared memory
         __sync_synchronize();
-        // Force sync entire shared memory region to ensure persistence
-        if (msync(shm_base, shm_size, MS_SYNC | MS_INVALIDATE) != 0) {
-            SPDLOG_ERROR("msync failed: {}", strerror(errno));
-            // Critical error - data might not be visible to other processes
-            return false;
-        }
+        // Persist only the written page, not the whole region (see
+        // sync_shm_page_range) - the old full-region msync was the bottleneck.
+        sync_shm_page_range(shm_base, shm_size,
+                            data_area + cacheline_to_index(addr_to_cacheline(addr)) * SHM_CACHELINE_SIZE,
+                            SHM_CACHELINE_SIZE);
         
         SPDLOG_DEBUG("Total wrote {} bytes starting at addr 0x{:x}", size, addr);
         return true;
@@ -398,16 +438,39 @@ bool SharedMemoryManager::write_cacheline(uint64_t addr, const uint8_t* data, si
     
     // Memory barrier to ensure write is visible to other processes
     __sync_synchronize();
-    // Force sync to backing store
-    if (msync(shm_base, shm_size, MS_SYNC | MS_INVALIDATE) != 0) {
-        SPDLOG_ERROR("msync failed: {}", strerror(errno));
-        // Critical error - data might not be visible to other processes
-        return false;
-    }
+    // Persist only the written cacheline's page (see sync_shm_page_range).
+    sync_shm_page_range(shm_base, shm_size, cacheline_data + offset, size);
     
     SPDLOG_DEBUG("Wrote {} bytes to addr 0x{:x} (cacheline 0x{:x} offset {})",
                  size, addr, cacheline_addr, offset);
     
+    return true;
+}
+
+bool SharedMemoryManager::zero_range(uint64_t addr, size_t size) {
+    const uint64_t capacity = header ? header->num_cachelines * SHM_CACHELINE_SIZE : 0;
+    if (size == 0 || addr > UINT64_MAX - size || addr + size > capacity) {
+        return false;
+    }
+
+    uint64_t first = addr_to_cacheline(addr);
+    uint64_t last = addr_to_cacheline(addr + size - 1);
+    uint8_t* start = get_cacheline_data(first);
+    uint8_t* end = get_cacheline_data(last);
+    if (!start || !end) {
+        return false;
+    }
+    std::memset(start, 0, static_cast<size_t>(end - start) + SHM_CACHELINE_SIZE);
+    {
+        std::unique_lock<std::shared_mutex> metadata_lock(metadata_mutex);
+        const uint64_t first_cacheline = addr_to_cacheline(addr);
+        const uint64_t last_cacheline = addr_to_cacheline(addr + size - 1);
+        auto it = metadata_cache.lower_bound(first_cacheline);
+        while (it != metadata_cache.end() && it->first <= last_cacheline) {
+            it = metadata_cache.erase(it);
+        }
+    }
+    std::atomic_thread_fence(std::memory_order_release);
     return true;
 }
 
@@ -425,6 +488,12 @@ CachelineMetadata* SharedMemoryManager::get_cacheline_metadata(uint64_t cachelin
     metadata_cache[cacheline_addr] = std::move(metadata);
     
     return ptr;
+}
+
+CachelineMetadata* SharedMemoryManager::find_cacheline_metadata(uint64_t cacheline_addr) {
+    std::shared_lock<std::shared_mutex> lock(metadata_mutex);
+    auto it = metadata_cache.find(cacheline_addr);
+    return it == metadata_cache.end() ? nullptr : it->second.get();
 }
 
 bool SharedMemoryManager::allocate_region(uint64_t addr, size_t size) {

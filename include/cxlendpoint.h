@@ -368,6 +368,11 @@ public:
 
     std::vector<occupation_info> occupation; // timestamp, pa
     std::unordered_set<uint64_t> address_cache{};
+    // address -> index in `occupation`, so insert() refreshes an existing
+    // entry in O(1) instead of an O(n) scan (O(n^2) overall stalled the server
+    // during dax-namespace init). Kept in sync by insert(), rebuilt by
+    // update_address_cache(); guard staleness via occupation[idx].address==addr.
+    std::unordered_map<uint64_t, size_t> occupation_pos_{};
     bool cache_valid = false;
     CXLMemExpanderEvent counter{};
     CXLMemExpanderEvent last_counter{};
@@ -424,8 +429,11 @@ public:
     void update_address_cache() {
         if (cache_valid) return;
         address_cache.clear();
-        for (const auto& occ : occupation)
-            address_cache.insert(occ.address);
+        occupation_pos_.clear();
+        for (size_t i = 0; i < occupation.size(); ++i) {
+            address_cache.insert(occupation[i].address);
+            occupation_pos_[occupation[i].address] = i;
+        }
         cache_valid = true;
     }
     // 当 occupation 更新时调用此函数

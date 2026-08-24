@@ -39,4 +39,10 @@
 	url = https://github.com/forresti/osu-micro-benchmarks
 [submodule "lib/qemu"]
 	path = lib/qemu
-	url = https://github.com/CXLMemUring/qemu
+	url = https://github.com/poal023/qemu-cxl-type2
+[submodule "workloads/lmbench"]
+	path = workloads/lmbench
+	url = https://github.com/intel/lmbench
+[submodule "workloads/cxlalloc"]
+	path = workloads/cxlalloc
+	url = https://github.com/poal023/cxlalloc

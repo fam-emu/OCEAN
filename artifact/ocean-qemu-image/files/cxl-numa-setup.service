@@ -1,0 +1,14 @@
+[Unit]
+Description=Configure CXL Memory as NUMA Node
+After=graphical.target
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/usr/local/bin/fixed-numa-setup.sh
+StandardOutput=journal
+StandardError=journal
+TimeoutSec=infinity
+
+[Install]
+WantedBy=graphical.target

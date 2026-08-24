@@ -1,0 +1,13 @@
+#!/lib/init/init-d-script
+### BEGIN INIT INFO
+# Provides:             cxl-monitor
+# Required-Start:       $syslog $time $remote_fs
+# Required-Stop:        $syslog $time $remote_fs
+# Default-Start:        2 3 4 5
+# Default-Stop:         0 1 6
+# Short-Description: CXL Monitor Daemon 
+# Description: monitoring of cxl events
+### END INIT INFO 
+
+DAEMON=/usr/bin/cxl
+DAEMON_ARGS="monitor --daemon"

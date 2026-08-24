@@ -1,4 +1,5 @@
 *gromacs*
+.worktrees/
 workloads/gromacs/gromacs-2025.3.tar.gz
 workloads/gromacs/gromacs-2025.3/.black.toml
 workloads/gromacs/gromacs-2025.3/.clang-format

@@ -1,0 +1,28 @@
+name: CXL workload integration
+
+on:
+  workflow_dispatch:
+    inputs:
+      runner_args:
+        description: Arguments shared by the workload runners (image, kernel, and transport settings)
+        required: true
+        type: string
+
+jobs:
+  workloads:
+    runs-on: [self-hosted, linux, kvm, cxl]
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+      - name: Run CXL workload suite
+        shell: bash
+        env:
+          CXL_RUNNER_ARGS: ${{ inputs.runner_args }}
+        run: |
+          set -euo pipefail
+          for runner in lat-mem-rd osu-allgather stream-mpi; do
+            python3 "ocean-test-scripts/${runner}.py" ${CXL_RUNNER_ARGS} | tee "${runner}.log"
+            grep -F '[ PASSED ]' "${runner}.log"
+          done

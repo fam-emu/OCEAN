@@ -1,6 +1,6 @@
 #!/bin/bash
 # Exit immediately if any command fails
-set -e 
+set -e
 
 echo "==== Configuring apt ===="
 export DEBIAN_FRONTEND=noninteractive
@@ -10,7 +10,7 @@ lsblk -o NAME,TYPE,SIZE,MOUNTPOINT
 
 echo "==== Updating and installing base compilation tools ===="
 apt-get update
-apt-get install -y dselect build-essential cmake 
+apt-get install -y dselect build-essential cmake
 
 echo "==== Restoring original packages ===="
 xargs apt-get install -y --no-install-recommends --ignore-missing < /tmp/installed_packages.txt
@@ -33,7 +33,7 @@ cmake .. \
    -DGMX_BUILD_OWN_FFTW=ON \
 
 make -j$(nproc)
-make install 
+make install
 
 echo "==== Installing OSU Microbenchmarks ===="
 cd /root

@@ -31,13 +31,13 @@ wait_for_cxl_device() {
 
 setup_cxl_region() {
     log "Creating CXL region..."
-    
+
     # Check if region already exists
     if cxl list -R 2>/dev/null | grep -q "region0"; then
         log "Region0 already exists, skipping creation"
         return 0
     fi
-    
+
     # Create CXL region
     if cxl create-region -m -d decoder0.0 -w 1 mem0 -s "$CXL_REGION_SIZE" 2>&1 | tee -a "$LOG_FILE"; then
         log "CXL region created successfully"
@@ -50,16 +50,16 @@ setup_cxl_region() {
 
 setup_dax_namespace() {
     log "Setting up DAX namespace..."
-    
+
     # Check if namespace already exists
     if ndctl list -N 2>/dev/null | grep -q "namespace"; then
         log "Namespace already exists"
         return 0
     fi
-    
+
     # Wait a bit for region to be fully initialized
     sleep 2
-    
+
     # Create DAX namespace
     if ndctl create-namespace -m dax -r region0 2>&1 | tee -a "$LOG_FILE"; then
         log "DAX namespace created successfully"
@@ -81,20 +81,20 @@ setup_dax_namespace() {
 
 configure_numa_node() {
     log "Configuring NUMA node..."
-    
+
     # Find the DAX device
     local dax_device=$(ls /sys/bus/dax/devices/ 2>/dev/null | head -n1)
-    
+
     if [ -z "$dax_device" ]; then
         log "WARNING: No DAX device found"
         return 1
     fi
-    
+
     # Online the memory as NUMA node 1
     if [ -f "/sys/bus/dax/devices/$dax_device/target_node" ]; then
         local target_node=$(cat "/sys/bus/dax/devices/$dax_device/target_node")
         log "Target NUMA node: $target_node"
-        
+
         # Try to online the memory
         if daxctl reconfigure-device --mode=system-ram "$dax_device" 2>&1 | tee -a "$LOG_FILE"; then
             log "Memory onlined as system RAM"
@@ -102,16 +102,16 @@ configure_numa_node() {
             log "WARNING: Could not online memory as system RAM"
         fi
     fi
-    
+
     # Verify NUMA configuration
     numactl --hardware 2>&1 | tee -a "$LOG_FILE"
-    
+
     return 0
 }
 
 main() {
     log "Starting CXL NUMA configuration..."
-    
+
     # Load required kernel modules
     modprobe cxl_core 2>/dev/null || true
     modprobe cxl_pci 2>/dev/null || true
@@ -121,30 +121,30 @@ main() {
     modprobe dax 2>/dev/null || true
     modprobe device_dax 2>/dev/null || true
     modprobe kmem 2>/dev/null || true
-    
+
     # Wait for CXL device to appear
     if ! wait_for_cxl_device; then
         log "Aborting: CXL device not available"
         exit 1
     fi
-    
+
     # Setup CXL region
     if ! setup_cxl_region; then
         log "Warning: CXL region setup failed, continuing anyway"
     fi
-    
+
     # Setup DAX namespace
     if ! setup_dax_namespace; then
         log "Warning: DAX namespace setup failed, continuing anyway"
     fi
-    
+
     # Configure NUMA node
     #if ! configure_numa_node; then
     #    log "Warning: NUMA node configuration incomplete"
     #fi
-    
+
     log "CXL NUMA configuration completed"
-    
+
     # Display final configuration
     log "Final CXL configuration:"
     cxl list 2>&1 | tee -a "$LOG_FILE"
